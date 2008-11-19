@@ -1014,7 +1014,7 @@ int main(int argc, char **argv)
 		double trips = (double)benchmark_processed,
 		 			 secs = (double)(benchmark_end - benchmark_start) / 1000000.0;
 
-		printf("Benchmark: %.0f trips / %f.2 secs -> %f.2 trips/sec\n",
+		printf("Benchmark: %.0f trips / %.2f secs -> %.2f trips/sec\n",
 				trips,
 				secs,
 				trips / secs);
