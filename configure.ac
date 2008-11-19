@@ -1,4 +1,4 @@
-AC_INIT([tripcrunch], [1.0.0], [anonymousofsuomus@gmail.com], [tripcrunch])
+AC_INIT([tripcrunch], [1.0.0], [tatu.kilappa_AT_iki.fi], [tripcrunch])
 
 AC_CANONICAL_BUILD
 AC_CANONICAL_HOST
@@ -25,13 +25,13 @@ AC_CHECK_LIB([pthread],
 						 [pthread_create],
 						 [],                                                                    
 						 [pthread=no])
-AC_CHECK_HEADER([crypt.h],
-								[crypt=yes],
-								[crypt=no])
-AC_CHECK_LIB([crypt],
-						 [crypt],
-						 [],                                                                    
-						 [pthread=no])
+AC_CHECK_HEADER([openssl/des.h],
+								[openssl=yes],
+								[openssl=no])
+AC_CHECK_LIB([ssl],
+						 [DES_fcrypt],
+						 [],
+						 [openssl=no])
 iconv=[yes]
 
 AC_CONFIG_HEADERS([src/config.h])
@@ -43,7 +43,7 @@ if test x$pthread == xno ; then
 	AC_MSG_ERROR([pthread not found])
 fi
 if test x$crypt == xno ; then
-	AC_MSG_ERROR([crypt() not found])
+	AC_MSG_ERROR([openssl DES_fcrypt() not found])
 fi
 if test x$iconv == xno ; then
 	AC_MSG_ERROR([iconv not found])

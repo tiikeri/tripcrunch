@@ -10,11 +10,11 @@
 /* Define to 1 if you have the <inttypes.h> header file. */
 #define HAVE_INTTYPES_H 1
 
-/* Define to 1 if you have the `crypt' library (-lcrypt). */
-#define HAVE_LIBCRYPT 1
-
 /* Define to 1 if you have the `pthread' library (-lpthread). */
 #define HAVE_LIBPTHREAD 1
+
+/* Define to 1 if you have the `ssl' library (-lssl). */
+#define HAVE_LIBSSL 1
 
 /* Define to 1 if you have the <memory.h> header file. */
 #define HAVE_MEMORY_H 1
@@ -44,7 +44,7 @@
 #define PACKAGE "tripcrunch"
 
 /* Define to the address where bug reports for this package should be sent. */
-#define PACKAGE_BUGREPORT "anonymousofsuomus@gmail.com"
+#define PACKAGE_BUGREPORT "tatu.kilappa_AT_iki.fi"
 
 /* Define to the full name of this package. */
 #define PACKAGE_NAME "tripcrunch"

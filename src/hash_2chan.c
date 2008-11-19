@@ -13,10 +13,11 @@
 #include "hash_2chan.h"
 #include "tripcrunch.h"
 
-#include <crypt.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include "openssl/des.h"
 
 ////////////////////////////////////////
 // Global //////////////////////////////
@@ -208,12 +209,10 @@ char* hash_2chan(const char *src)
 		}
 	}
 
-	// Crypt the source and return a clone of dst.
-	pthread_mutex_lock(&hash_mutex);
-	char *enc = crypt(str, salt);
+	// Crypt the source and return a clone of essential data.
+	char enc[15]; // Should always be enough.
+	DES_fcrypt(str, salt, enc);
 	char *ret = strdup(enc + (strlen(enc) - 10));
-	pthread_mutex_unlock(&hash_mutex);
-	free(str);
 	return ret;
 }
 

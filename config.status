@@ -502,7 +502,7 @@ s,@PACKAGE_NAME@,|#_!!_#|tripcrunch,g
 s,@PACKAGE_TARNAME@,|#_!!_#|tripcrunch,g
 s,@PACKAGE_VERSION@,|#_!!_#|1.0.0,g
 s,@PACKAGE_STRING@,|#_!!_#|tripcrunch 1.0.0,g
-s,@PACKAGE_BUGREPORT@,|#_!!_#|anonymousofsuomus@|#_!!_#|gmail.com,g
+s,@PACKAGE_BUGREPORT@,|#_!!_#|tatu.kilappa_AT_iki.fi,g
 s,@exec_prefix@,|#_!!_#|${prefix},g
 s,@prefix@,|#_!!_#|/usr/local,g
 s,@program_transform_name@,|#_!!_#|s\,x\,x\,,g
@@ -529,7 +529,7 @@ s,@DEFS@,|#_!!_#|-DHAVE_CONFIG_H,g
 s,@ECHO_C@,|#_!!_#|,g
 s,@ECHO_N@,|#_!!_#|-n,g
 s,@ECHO_T@,|#_!!_#|,g
-s,@LIBS@,|#_!!_#|-lcrypt -lpthread ,g
+s,@LIBS@,|#_!!_#|-lssl -lpthread ,g
 s,@build_alias@,|#_!!_#|,g
 s,@host_alias@,|#_!!_#|,g
 s,@target_alias@,|#_!!_#|,g
@@ -876,7 +876,7 @@ s,^\([	 #]*\)[^	 ]*\([	 ]*PACKAGE_NAME\)[	 (].*,\1define\2 "tripcrunch" ,
 s,^\([	 #]*\)[^	 ]*\([	 ]*PACKAGE_TARNAME\)[	 (].*,\1define\2 "tripcrunch" ,
 s,^\([	 #]*\)[^	 ]*\([	 ]*PACKAGE_VERSION\)[	 (].*,\1define\2 "1.0.0" ,
 s,^\([	 #]*\)[^	 ]*\([	 ]*PACKAGE_STRING\)[	 (].*,\1define\2 "tripcrunch 1.0.0" ,
-s,^\([	 #]*\)[^	 ]*\([	 ]*PACKAGE_BUGREPORT\)[	 (].*,\1define\2 "anonymousofsuomus@gmail.com" ,
+s,^\([	 #]*\)[^	 ]*\([	 ]*PACKAGE_BUGREPORT\)[	 (].*,\1define\2 "tatu.kilappa_AT_iki.fi" ,
 s,^\([	 #]*\)[^	 ]*\([	 ]*PACKAGE\)[	 (].*,\1define\2 "tripcrunch" ,
 s,^\([	 #]*\)[^	 ]*\([	 ]*VERSION\)[	 (].*,\1define\2 "1.0.0" ,
 s,^\([	 #]*\)[^	 ]*\([	 ]*STDC_HEADERS\)[	 (].*,\1define\2 1 ,
@@ -891,7 +891,7 @@ s,^\([	 #]*\)[^	 ]*\([	 ]*HAVE_STDINT_H\)[	 (].*,\1define\2 1 ,
 s,^\([	 #]*\)[^	 ]*\([	 ]*HAVE_UNISTD_H\)[	 (].*,\1define\2 1 ,
 s,^\([	 #]*\)[^	 ]*\([	 ]*HAVE_DLFCN_H\)[	 (].*,\1define\2 1 ,
 s,^\([	 #]*\)[^	 ]*\([	 ]*HAVE_LIBPTHREAD\)[	 (].*,\1define\2 1 ,
-s,^\([	 #]*\)[^	 ]*\([	 ]*HAVE_LIBCRYPT\)[	 (].*,\1define\2 1 ,
+s,^\([	 #]*\)[^	 ]*\([	 ]*HAVE_LIBSSL\)[	 (].*,\1define\2 1 ,
 s/ $//
 s,^[	 #]*u.*,/* & */,
 CEOF
