@@ -5,6 +5,9 @@
 /** Replacement string length for futallaby salt replace. */
 #define FUTA_REPLACE_LEN 14
 
+/** If defined, use multireplace instead of normal replace. */
+#define USE_STR_MULTIREPLACE
+
 ////////////////////////////////////////
 // Include /////////////////////////////
 ////////////////////////////////////////
@@ -28,6 +31,24 @@ const char *search_space_2chan =
 "!\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[]^_`abcdefghijklmnopqrstuvwxyz{|}";
 
 ////////////////////////////////////////
+// Struct //////////////////////////////
+////////////////////////////////////////
+
+/** \brief Struct for char replacements.
+ */
+typedef struct char_replace_struct
+{
+	/** Source character. */
+	char src;
+
+	/** Destination string. */
+	const char *dst;
+
+	/** Size of replace string. */
+	size_t dstlen;
+} char_replace_t;
+
+////////////////////////////////////////
 // Local ///////////////////////////////
 ////////////////////////////////////////
 
@@ -36,6 +57,85 @@ static char *futa_fr = ":;<=>?@[\\]^_`";
 
 /** Futallaby salt replace to. */
 static char *futa_to = "ABCDEFGabcdef";
+
+#ifdef USE_STR_MULTIREPLACE
+
+/** \brief String multi-replace.
+ *
+ * Performs a replace of certain singular characters into other strings.
+ *
+ * Faster than performing several replaces in sequence, but less versatile.
+ *
+ * Will free the source string on replace.
+ *
+ * @param src Input string.
+ * @param replacements Replacement structs.
+ * @param rnum Replacement table size.
+ * @return Modified or the original string.
+ */
+static char* str_multireplace(char *src, const char_replace_t *replacements,
+		size_t rnum)
+{
+	size_t orig_len = strlen(src),
+				 new_len = orig_len;
+	int replace_needed = 0;
+
+	for(size_t ii = 0; (ii < orig_len); ++ii)
+	{
+		char cc = src[ii];
+
+		for(size_t jj = 0; (jj < rnum); ++jj)
+		{
+			const char_replace_t *rep = replacements + jj;
+
+			if(rep->src == cc)
+			{
+				new_len += rep->dstlen - 1;
+				replace_needed = 1;
+				break;
+			}
+		}
+	}
+
+	// Potentially just bail out.
+	if(!replace_needed)
+	{
+		return src;
+	}
+
+	char *ret = (char*)malloc(sizeof(char) * (new_len + 1));
+	ret[new_len] = 0;
+
+	size_t kk = 0;
+	for(size_t ii = 0; (ii < orig_len); ++ii)
+	{
+		char cc = src[ii];
+
+		int replace_done = 0;
+		for(size_t jj = 0; (jj < rnum); ++jj)
+		{
+			const char_replace_t *rep = replacements + jj;
+
+			if(rep->src == cc)
+			{
+				size_t dstlen = rep->dstlen;
+				memcpy(ret + kk, rep->dst, dstlen);
+				kk += dstlen;
+				replace_done = 1;
+				break;
+			}
+		}
+		if(!replace_done)
+		{
+			ret[kk++] = cc;
+		}
+	}
+
+	free(src);
+	return ret;
+}
+
+#else
 
 /** \brief Perform a string replace.
  *
@@ -137,6 +237,8 @@ static char* str_replace(char *src, const char *needle, const char *replacement)
 	return ret;
 }
 
+#endif
+
 /** \brief Perform a htmlspecialchars replace on a source string.
  *
  * @param src Source string.
@@ -145,12 +247,26 @@ static char* str_replace(char *src, const char *needle, const char *replacement)
 static char* htmlspecialchars(char *src);
 static char* htmlspecialchars(char *src)
 {
+#ifdef USE_STR_MULTIREPLACE
+	static const char_replace_t htmlspecialchar_replaces[] =
+	{
+		{ '&', "&amp;", 5 },
+		{ '<', "&lt;", 4 },
+		{ '>', "&gt;", 4 },
+		{ '"', "&quot;", 6 },
+		{ '\'', "&39;", 5 }
+	};
+	static const size_t htmlspecialchar_replace_count = 5;
+	return str_multireplace(src,
+			htmlspecialchar_replaces,
+			htmlspecialchar_replace_count);
+#else
 	src = str_replace(src, "&", "&amp;");
 	src = str_replace(src, "<", "&lt;");
 	src = str_replace(src, ">", "&gt;");
 	src = str_replace(src, "\"", "&quot;");
-	src = str_replace(src, "'", "&#39;");
-	return src;
+	return str_replace(src, "'", "&#39;");
+#endif
 }
 
 ////////////////////////////////////////
