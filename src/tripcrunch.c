@@ -32,6 +32,8 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/time.h>
+#include <time.h>
 
 ////////////////////////////////////////
 // Global //////////////////////////////
@@ -56,7 +58,7 @@ typedef struct tripcode_struct
 } tripcode_t;
 
 ////////////////////////////////////////
-// Local ///////////////////////////////
+// Local variable //////////////////////
 ////////////////////////////////////////
 
 /** Usage help string. */
@@ -67,6 +69,7 @@ static const char usage[] =
 "Command line options without arguments:\n"
 "  -2, --2chan                          Search using the 2chan algorithm.\n"
 "                                       (default).\n"
+"  -b, --benchmark                      Display rudimentary benchmarks.\n"
 "  -h, --help                           Print this help.\n"
 "  -l, --enable-leet                    Enable leetspeak in comparisons.\n"
 "  -g, --generate                       Generate tripcodes instead of search.\n\n"
@@ -84,8 +87,20 @@ static pthread_cond_t term_cond;
 /** Used for termination. */
 static pthread_mutex_t term_mutex;
 
+/** Used for benchmark display. */
+static int flag_print_benchmarks = 0;
+
 /** Used for termination. */
-static int tripcrunch_terminate = 0;
+static int flag_tripcrunch_terminate = 0;
+
+/** Number of tripcodes processed. */
+static int64_t benchmark_processed = 0;
+
+/** Benchmark starting time. */
+static int64_t benchmark_start;
+
+/** Benchmark starting time. */
+static int64_t benchmark_end;
 
 /** Leet flag. */
 static int enable_leet = 0;
@@ -125,6 +140,10 @@ static char *progress_filename = NULL;
 
 /** Encrypt function to use. */
 char* (*encrypt_function)(char *dst, const char*) = NULL;
+
+////////////////////////////////////////
+// Local function //////////////////////
+////////////////////////////////////////
 
 /** \brief Signal handler.
  *
@@ -203,6 +222,20 @@ char* progress_read(const char *filename)
 
 	fclose(pfile);
 	return ret;
+}
+
+/** \brief Get current time as a signed 64-bit integer.
+ *
+ * @return Current time in microseconds.
+ */
+int64_t get_current_time_int64(void);
+int64_t get_current_time_int64(void)
+{
+	struct timeval tv;
+
+	gettimeofday(&tv, NULL);
+
+	return (int64_t)(tv.tv_sec) * (int64_t)1000000 + (int64_t)(tv.tv_usec);
 }
 
 /** \brief Save progress into file.
@@ -413,7 +446,7 @@ char *enumerate_string(char *old, int jump, size_t *len)
 char* get_next_string(char *dst, size_t *len);
 char* get_next_string(char *dst, size_t *len)
 {
-	if(tripcrunch_terminate)
+	if(flag_tripcrunch_terminate)
 	{
 		return NULL;
 	}
@@ -428,6 +461,9 @@ char* get_next_string(char *dst, size_t *len)
 		dst = (char*)malloc(sizeof(char) * (current_tripcode_len + 1));
 	}
 	memcpy(dst, current_tripcode, sizeof(char) * (current_tripcode_len + 1));
+
+	// The calculation for benchmarks must be in the critical section.
+	++benchmark_processed;
 
 	pthread_mutex_unlock(&term_mutex);
 	return dst;
@@ -602,6 +638,7 @@ int main(int argc, char **argv)
 	static const struct option opts_long[] =
 	{
 		{	"2chan", no_argument, NULL, '2' },
+		{	"benchmark", no_argument, NULL, 'h' },
 		{	"help", no_argument, NULL, 'h' },
 		{	"enable-leet", no_argument, NULL, 'l' },
 		{	"generate", no_argument, NULL, 'g' },
@@ -610,7 +647,7 @@ int main(int argc, char **argv)
 		{	"start-from", required_argument, NULL, 's' },
 		{ NULL, 0, 0, 0 }
 	};
-	static const char *opts_short = "2hlgn:p:s:";
+	static const char *opts_short = "2bhlgn:p:s:";
 
 	// Local args.
 	int enable_generate = 0;
@@ -635,6 +672,10 @@ int main(int argc, char **argv)
 					return 1;
 				}
 				encrypt_function = hash_2chan;
+				break;
+
+			case 'b':
+				flag_print_benchmarks = 1;
 				break;
 
 			case 'h':
@@ -833,9 +874,11 @@ int main(int argc, char **argv)
 		}
 	}
 
+	benchmark_start = get_current_time_int64();
 	pthread_cond_wait(&term_cond, &term_mutex);
+	benchmark_end = get_current_time_int64();
 
-	tripcrunch_terminate = 1;
+	flag_tripcrunch_terminate = 1;
 	while(threads_running > 0)
 	{
 		pthread_cond_wait(&term_cond, &term_mutex);
@@ -865,6 +908,18 @@ int main(int argc, char **argv)
 		printf("Last search: %s\n", current_tripcode);
 	}
 	exit_cleanup();
+
+	// Only print benchmarks if requested.
+	if(flag_print_benchmarks)
+	{
+		double trips = (double)benchmark_processed,
+		 			 secs = (double)(benchmark_end - benchmark_start) / 1000000.0;
+
+		printf("Benchmark: %.0f trips / %f secs -> %f trips/sec\n",
+				trips,
+				secs,
+				trips / secs);
+	}
 
 	return 0;
 }
