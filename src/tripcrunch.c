@@ -85,8 +85,8 @@ static const char *search_space;
 /** Search space size. */
 static int search_space_size = 0;
 
-/** Start searches from here if it exists. */
-static char *starting_trip = NULL;
+/** Current tripcode. */
+static char *current_tripcode = NULL;
 
 /** Desired tripcode to compare into. */
 static char *desired_tripcode = NULL;
@@ -283,6 +283,33 @@ char *enumerate_string(char *old, int jump)
 	return old;
 }
 
+/** \brief Get a new string in a critical section.
+ *
+ * This function is used to get a new string, generated from the current one.
+ *
+ * The string returned from this function must be freed with free() after
+ * use.
+ *
+ * If this function returns NULL, the caller should stop searching.
+ *
+ * @return Newly allocated string that is the next one in sequence or NULL.
+ */
+char* get_next_string(void);
+char* get_next_string(void)
+{
+	if(tripcrunch_terminate)
+	{
+		return NULL;
+	}
+	pthread_mutex_lock(&term_mutex);
+
+	current_tripcode = enumerate_string(current_tripcode, 1);
+	char *ret = strdup(current_tripcode);
+
+	pthread_mutex_unlock(&term_mutex);
+	return ret;
+}
+
 /** \brief Test for character equals.
  *
  * @param lhs Left-hand-side comparison.
@@ -330,11 +357,9 @@ void* threadfunc_tripcrunch(void *args)
 	++threads_running;
 	pthread_mutex_unlock(&term_mutex);
 
-	char *trip = (starting_trip) ? strdup(starting_trip) : NULL;
-	trip = enumerate_string(trip, *(int*)args);
-	free(args);
-
-	while(!tripcrunch_terminate)
+	for(char *trip = get_next_string();
+			(trip != NULL);
+			trip = get_next_string())
 	{
 		char *code = encrypt_function(trip);
 
@@ -358,11 +383,8 @@ void* threadfunc_tripcrunch(void *args)
 		}
 		free(code);
 		//puts(trip);
-		trip = enumerate_string(trip, (int)thread_count);
+		free(trip);
 	}
-
-	printf("Last search: %s\n", trip);
-	free(trip);
 
 	pthread_mutex_lock(&term_mutex);
 	--threads_running;
@@ -452,9 +474,9 @@ int main(int argc, char **argv)
 		}
 		else if(!strcmp(currarg, "-s"))
 		{
-			starting_trip = nextarg;
+			current_tripcode = nextarg;
 			++ii;
-			if(!starting_trip)
+			if(!current_tripcode)
 			{
 				printf("ERROR, give a valid password to -s\n");
 				return 1;
@@ -462,8 +484,8 @@ int main(int argc, char **argv)
 		}
 		else if(!strncmp(currarg, "--start-from=", 13))
 		{
-			starting_trip = currarg + 13;
-			if(strlen(starting_trip) <= 0)
+			current_tripcode = currarg + 13;
+			if(strlen(current_tripcode) <= 0)
 			{
 				printf("ERROR, give a valid password to --start-from=\n");
 				return 1;
@@ -479,6 +501,12 @@ int main(int argc, char **argv)
 			desired_tripcode = currarg;
 			desired_tripcode_len = strlen(desired_tripcode);
 		}
+	}
+
+	// Starting tripcode duplication if specified.
+	if(current_tripcode)
+	{
+		current_tripcode = strdup(current_tripcode);
 	}
 
 	// If no algo selected yet, pick 2chan.
@@ -568,6 +596,14 @@ int main(int argc, char **argv)
 	pthread_mutex_destroy(&hash_mutex);
 	pthread_mutex_destroy(&term_mutex);
 	free(search_lookup);
+
+	// Current tripcode is not necessarily initialized.
+	if(current_tripcode)
+	{
+		printf("Last search: %s\n", current_tripcode);
+		free(current_tripcode);
+	}
+
 	return 0;
 }
 
