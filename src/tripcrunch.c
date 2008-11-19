@@ -12,9 +12,6 @@
 // Define //////////////////////////////
 ////////////////////////////////////////
 
-/** Maximum length to search. */
-#define TRIPMAXLEN 8
-
 /** Maximum ASCII ordinal in search strings. */
 #define SEARCH_MAX_ORD 128
 
@@ -27,6 +24,7 @@
 #include "tripcrunch.h"
 
 #include <ctype.h>
+#include <getopt.h>
 #include <inttypes.h>
 #include <limits.h>
 #include <signal.h>
@@ -42,21 +40,40 @@
 pthread_mutex_t hash_mutex;
 
 ////////////////////////////////////////
+// Struct //////////////////////////////
+////////////////////////////////////////
+
+/** \brief Structure for storing tripcodes.
+ */
+typedef struct tripcode_struct
+{
+	/** Character string. */
+	char *trip;
+
+	/** String length in chars. */
+	size_t len;
+} tripcode_t;
+
+////////////////////////////////////////
 // Local ///////////////////////////////
 ////////////////////////////////////////
 
 /** Usage help string. */
 static const char usage[] =
-"tripcrunch [options] <desired_tripcode>\n"
+"tripcrunch [options] <desired_tripcodes>\n"
 "This program will perform a brute-force search for codes producing the\n"
 "desired tripcode for use in online image board (or other places).\n\n"
 "Command line options without arguments:\n"
-"  -2, --2chan                     Search using the 2chan algorithm (default).\n"
-"  -h, --help                      Print this help.\n"
-"  -l, --enable-leet               Enable leetspeak in comparisons.\n\n"
+"  -2, --2chan                         Search using the 2chan algorithm.\n"
+"                                      (default).\n"
+"  -h, --help                          Print this help.\n"
+"  -l, --enable-leet                   Enable leetspeak in comparisons.\n"
+"  -g, --generate                      Generate tripcodes instead of search.\n\n"
 "Command line options with arguments:\n"
-"  -g <pass>, --generate=<pass>    Generate tripcode from password and exit.\n"
-"  -n <num>, --nthreads=<num>      Number of threads to use (default: 1).";
+"  -n <num>, --nthreads=<num>          Number of threads to use.\n"
+"                                      (default: 1)\n"
+"  -s <code>, --starting-trip=<code>   Start searchies from this tripcode.\n"
+"                                      (default: empty)";
 
 /** Used for termination. */
 static pthread_cond_t term_cond;
@@ -94,11 +111,11 @@ static size_t current_tripcode_len = 0;
 /** Space required for hash space, dependant on the password method. */
 static size_t hash_space_required;
 
-/** Desired tripcode to compare into. */
-static char *desired_tripcode = NULL;
+/** Table of tripcodes. */
+static tripcode_t *search_tripcodes = NULL;
 
-/** Desired tripcode length. */
-size_t desired_tripcode_len = 0;
+/** Number of searched tripcodes. */
+static size_t search_tripcode_count = 0;
 
 /** Encrypt function to use. */
 char* (*encrypt_function)(char *dst, const char*) = NULL;
@@ -397,21 +414,26 @@ void* threadfunc_tripcrunch(void *args_not_in_use)
 		encrypt_function(code, trip);
 
 		size_t len = strlen(code);
-		unsigned jj = 0;
-		for(unsigned ii = 0; (ii < len); ++ii)
+		for(size_t kk = 0; (kk < search_tripcode_count); ++kk)
 		{
-			if(char_equals(code[ii], desired_tripcode[jj]))
+			char *desired_tripcode = search_tripcodes[kk].trip;
+			size_t desired_tripcode_len = search_tripcodes[kk].len;
+			size_t jj = 0;
+			for(size_t ii = 0; (ii < len); ++ii)
 			{
-				++jj;
-				if(jj >= desired_tripcode_len)
+				if(char_equals(code[ii], desired_tripcode[jj]))
 				{
-					printf("Match: %s encrypts to trip %s\n", trip, code);
-					break;
+					++jj;
+					if(jj >= desired_tripcode_len)
+					{
+						printf("Match: %s encrypts to trip %s\n", trip, code);
+						break;
+					}
 				}
-			}
-			else
-			{
-				jj = 0;
+				else
+				{
+					jj = 0;
+				}
 			}
 		}
 		//puts(trip);
@@ -428,6 +450,31 @@ void* threadfunc_tripcrunch(void *args_not_in_use)
 	return 0;
 }
 
+/** \brief Free all reserved global memory.
+ */
+void exit_cleanup(void);
+void exit_cleanup(void)
+{
+	if(search_tripcodes)
+	{
+		for(size_t ii = 0; (ii < search_tripcode_count); ++ii)
+		{
+			free(search_tripcodes[ii].trip);
+		}
+		free(search_tripcodes);
+	}
+
+	if(current_tripcode)
+	{
+		free(current_tripcode);
+	}
+
+	if(search_lookup)
+	{
+		free(search_lookup);
+	}
+}
+
 ////////////////////////////////////////
 // Main ////////////////////////////////
 ////////////////////////////////////////
@@ -440,109 +487,109 @@ void* threadfunc_tripcrunch(void *args_not_in_use)
  */
 int main(int argc, char **argv)
 {
-	// Local args.
-	char *gentrip = NULL;
-
-	// Parse command line arguments.
-	for(int ii = 1; (ii < argc); ++ii)
+	// Option arguments.
+	static const struct option opts_long[] =
 	{
-		char *currarg = argv[ii];
-		char *nextarg = NULL;
-		if(ii < argc - 1)
+		{	"2chan", no_argument, NULL, '2' },
+		{	"help", no_argument, NULL, 'h' },
+		{	"enable-leet", no_argument, NULL, 'l' },
+		{	"generate", no_argument, NULL, 'g' },
+		{	"nthreads", required_argument, NULL, 'n' },
+		{	"start-from", required_argument, NULL, 's' },
+		{ NULL, 0, 0, 0 }
+	};
+	static const char *opts_short = "2hlgn:s:";
+
+	// Local args.
+	int enable_generate = 0;
+
+	while(1)
+	{
+		int indexptr = 0;
+		int opt = getopt_long(argc, argv, opts_short, opts_long, &indexptr);
+
+		if(opt == -1)
 		{
-			nextarg = argv[ii + 1];
+			break;
 		}
 
-		if(!strcmp(currarg, "-2") || !strcmp(currarg, "--2chan"))
+		switch(opt)
 		{
-			if(encrypt_function)
-			{
-				printf("Tripcode algorithm can only be selected once.\n");
+			case '2':
+				if(encrypt_function)
+				{
+					printf("Tripcode algorithm can only be selected once.\n");
+					return 1;
+				}
+				encrypt_function = hash_2chan;
+				break;
+
+			case 'h':
+				puts(usage);
+				return 0;
+
+			case 'l':
+				enable_leet = 1;
+				break;
+
+			case 'g':
+				enable_generate = 1;
+				break;
+
+			case 'n':
+				thread_count = strtol(optarg, NULL, 10);
+				if((thread_count == LONG_MAX) || (thread_count == LONG_MIN))
+				{
+					printf("Invalid thread count: %i\n", (int)thread_count);
+					return 1;
+				}
+				break;
+
+			case 's':
+				current_tripcode = strdup(optarg);
+				current_tripcode_len = strlen(current_tripcode);
+				break;
+
+			default:
+				puts(usage);
 				return 1;
-			}
-			encrypt_function = hash_2chan;
-		}
-		else if(!strcmp(currarg, "-h") || !strcmp(currarg, "--help"))
-		{
-			puts(usage);
-			return 0;
-		}
-		else if(!strcmp(currarg, "-l") || !strcmp(currarg, "--enable-leet"))
-		{
-			enable_leet = 1;
-		}
-		else if(!strcmp(currarg, "-g"))
-		{
-			gentrip = nextarg;
-			++ii;
-			if(!gentrip)
-			{
-				printf("ERROR, give a valid password to -g\n");
-				return 1;
-			}
-		}
-		else if(!strncmp(currarg, "--generate=", 11))
-		{
-			gentrip = currarg + 11;
-			if(strlen(gentrip) <= 0)
-			{
-				printf("ERROR, give a valid password to --generate=\n");
-				return 1;
-			}
-		}
-		else if(!strcmp(currarg, "-n") || !strncmp(currarg, "--nthreads=", 11))
-		{
-			if(!strcmp(currarg, "-n"))
-			{
-				thread_count = strtol(nextarg, NULL, 10);
-				++ii;
-			}
-			else
-			{
-				thread_count = strtol(currarg + 11, NULL, 10);
-			}
-			if((thread_count == LONG_MAX) || (thread_count == LONG_MIN))
-			{
-				printf("Invalid thread count: %i\n", (int)thread_count);
-				return 1;
-			}
-		}
-		else if(!strcmp(currarg, "-s"))
-		{
-			current_tripcode = nextarg;
-			++ii;
-			if(!current_tripcode)
-			{
-				printf("ERROR, give a valid password to -s\n");
-				return 1;
-			}
-		}
-		else if(!strncmp(currarg, "--start-from=", 13))
-		{
-			current_tripcode = currarg + 13;
-			if(strlen(current_tripcode) <= 0)
-			{
-				printf("ERROR, give a valid password to --start-from=\n");
-				return 1;
-			}
-		}
-		else
-		{
-			if(desired_tripcode)
-			{
-				printf("Tripcode to search can be only specified once.\n");
-				return 1;
-			}
-			desired_tripcode = currarg;
-			desired_tripcode_len = strlen(desired_tripcode);
 		}
 	}
 
-	// Starting tripcode duplication if specified.
-	if(current_tripcode)
+	while(optind < argc)
 	{
-		current_tripcode = strdup(current_tripcode);
-		current_tripcode_len = strlen(current_tripcode);
+		char *opt = argv[optind++];
+		size_t len = strlen(opt);
+
+		if(len > 0)
+		{
+			if(!search_tripcodes)
+			{
+				search_tripcodes = (tripcode_t*)malloc(sizeof(tripcode_t));
+				search_tripcode_count = 1;
+			}
+			else
+			{
+				search_tripcodes =
+					(tripcode_t*)realloc(search_tripcodes,
+							sizeof(tripcode_t) * (++search_tripcode_count));
+			}
+			tripcode_t *trip = search_tripcodes + (search_tripcode_count - 1);
+			trip->trip = strdup(opt);
+			trip->len = len;
+		}
+		else
+		{
+			puts("Empty string are not valid searching.");
+			return 1;
+		}
+	}
+
+	// Sanity check for tripcode count.
+	if(search_tripcode_count <= 0)
+	{
+		printf("Please specify at least one tripcode.\n");
+		return 1;
 	}
 
 	// If no algo selected yet, pick 2chan.
@@ -566,26 +613,35 @@ int main(int argc, char **argv)
 	}
 
 	// If generate trip requested, do it and exit.
-	if(gentrip)
+	if(enable_generate)
 	{
 		char *enc = (char*)malloc(sizeof(char) * hash_space_required);
-		encrypt_function(enc, gentrip);
-		printf("Password %s encrypts to tripcode %s\n", gentrip, enc);
+
+		for(size_t ii = 0; (ii < search_tripcode_count); ++ii)
+		{
+			char *trip = search_tripcodes[ii].trip;
+
+			encrypt_function(enc, trip);
+			printf("Password %s encrypts to tripcode %s\n", trip, enc);
+		}
+
 		free(enc);
+		exit_cleanup();
 		return 0;
 	}
 
-	// Sanity check for tripcode.
-	if(!desired_tripcode)
+	// Sanity check for tripcode lengths.
+	for(size_t ii = 0; (ii < search_tripcode_count); ++ii)
 	{
-		printf("Please specify a tripcode to search.\n");
-		return 1;
-	}
-	if(strlen(desired_tripcode) > TRIPMAXLEN)
-	{
-		printf("Desired tripcode may only be up to %u characters long.\n",
-				TRIPMAXLEN);
-		return 1;
+		tripcode_t *trip = search_tripcodes + ii;
+		if(trip->len >= hash_space_required)
+		{
+			printf("Code %s is %u chars long, too much for current algo (%u).\n",
+					trip->trip,
+					(unsigned)(trip->len),
+					(unsigned)(hash_space_required - 1));
+			return 1;
+		}
 	}
 
 	signal(SIGINT, tripcrunch_signal_handler);
@@ -631,14 +687,13 @@ int main(int argc, char **argv)
 	pthread_cond_destroy(&term_cond);
 	pthread_mutex_destroy(&hash_mutex);
 	pthread_mutex_destroy(&term_mutex);
-	free(search_lookup);
 
 	// Current tripcode is not necessarily initialized.
 	if(current_tripcode)
 	{
 		printf("Last search: %s\n", current_tripcode);
-		free(current_tripcode);
 	}
+	exit_cleanup();
 
 	return 0;
 }
