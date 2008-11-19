@@ -24,6 +24,7 @@
 #include "tripcrunch.h"
 
 #include <ctype.h>
+#include <errno.h>
 #include <getopt.h>
 #include <inttypes.h>
 #include <limits.h>
@@ -64,16 +65,18 @@ static const char usage[] =
 "This program will perform a brute-force search for codes producing the\n"
 "desired tripcode for use in online image board (or other places).\n\n"
 "Command line options without arguments:\n"
-"  -2, --2chan                         Search using the 2chan algorithm.\n"
-"                                      (default).\n"
-"  -h, --help                          Print this help.\n"
-"  -l, --enable-leet                   Enable leetspeak in comparisons.\n"
-"  -g, --generate                      Generate tripcodes instead of search.\n\n"
+"  -2, --2chan                          Search using the 2chan algorithm.\n"
+"                                       (default).\n"
+"  -h, --help                           Print this help.\n"
+"  -l, --enable-leet                    Enable leetspeak in comparisons.\n"
+"  -g, --generate                       Generate tripcodes instead of search.\n\n"
 "Command line options with arguments:\n"
-"  -n <num>, --nthreads=<num>          Number of threads to use.\n"
-"                                      (default: 1)\n"
-"  -s <code>, --starting-trip=<code>   Start searchies from this tripcode.\n"
-"                                      (default: empty)";
+"  -n <num>, --nthreads=<num>           Number of threads to use.\n"
+"                                       (default: 1)\n"
+"  -p <file>, --progress-file=<file>    Keep search state in a file.\n"
+"                                       (default: no)\n"
+"  -s <code>, --start-from=<code>       Start searchies from this tripcode.\n"
+"                                       (default: empty)";
 
 /** Used for termination. */
 static pthread_cond_t term_cond;
@@ -117,6 +120,9 @@ static tripcode_t *search_tripcodes = NULL;
 /** Number of searched tripcodes. */
 static size_t search_tripcode_count = 0;
 
+/** Progress filename. */
+static char *progress_filename = NULL;
+
 /** Encrypt function to use. */
 char* (*encrypt_function)(char *dst, const char*) = NULL;
 
@@ -144,6 +150,86 @@ static void tripcrunch_signal_handler(int signum)
 			pthread_cond_signal(&term_cond);
 			break;
 	}
+}
+
+/** \brief Read current progress into a trip from a file.
+ *
+ * Not that the entire file is read for crypto generation, including possible
+ * newlines (even ones at the end of file). The user should not modify the
+ * progress file by hand.
+ *
+ * @param filename File to read.
+ * @return Tripcode read or NULL.
+ */
+char* progress_read(const char *filename);
+char* progress_read(const char *filename)
+{
+	FILE *pfile = fopen(filename, "r");
+	if(!pfile)
+	{
+		return NULL;
+	}
+
+	size_t len = 0;
+	while(1)
+	{
+		int cc = fgetc(pfile);
+		if((cc == '\n') || (cc == EOF) || (cc == 0))
+		{
+			break;
+		}
+		++len;
+	}
+
+	if(len <= 0)
+	{
+		fprintf(stderr, "File \"%s\" does not contain a valid tripcode.\n",
+				filename);
+		fclose(pfile);
+		return NULL;
+	}
+
+	char *ret = (char*)malloc(sizeof(char) * (len + 1));
+	fseek(pfile, 0, SEEK_SET);
+	if(fgets(ret, (int)(len + 1), pfile) != ret)
+	{
+		fprintf(stderr, "Error reading \"%s\": %s\n",
+				filename,
+				strerror(errno));
+		free(ret);
+		fclose(pfile);
+		return NULL;
+	}
+
+	fclose(pfile);
+	return ret;
+}
+
+/** \brief Save progress into file.
+ *
+ * @param filename File to write.
+ * @param trip Tripcode to save.
+ */
+void progress_save(const char *filename, char *trip);
+void progress_save(const char *filename, char *trip)
+{
+	if(!trip || (strlen(trip) <= 0))
+	{
+		fputs("Tripcode to be saved is not valid.\n", stderr);
+		return;
+	}
+
+	FILE *pfile = fopen(filename, "w");
+	if(!pfile)
+	{
+		fprintf(stderr, "Could not save progress into \"%s\": %s\n",
+				filename,
+				strerror(errno));
+		return;
+	}
+
+	fprintf(pfile, "%s", current_tripcode);
+	fclose(pfile);
 }
 
 /** \brief Append to string.
@@ -489,6 +575,11 @@ void exit_cleanup(void)
 		free(current_tripcode);
 	}
 
+	if(progress_filename)
+	{
+		free(progress_filename);
+	}
+
 	if(search_lookup)
 	{
 		free(search_lookup);
@@ -515,10 +606,11 @@ int main(int argc, char **argv)
 		{	"enable-leet", no_argument, NULL, 'l' },
 		{	"generate", no_argument, NULL, 'g' },
 		{	"nthreads", required_argument, NULL, 'n' },
+		{	"progress-file", required_argument, NULL, 'p' },
 		{	"start-from", required_argument, NULL, 's' },
 		{ NULL, 0, 0, 0 }
 	};
-	static const char *opts_short = "2hlgn:s:";
+	static const char *opts_short = "2hlgn:p:s:";
 
 	// Local args.
 	int enable_generate = 0;
@@ -538,7 +630,8 @@ int main(int argc, char **argv)
 			case '2':
 				if(encrypt_function)
 				{
-					printf("Tripcode algorithm can only be selected once.\n");
+					fputs("Tripcode algorithm may only be specified once.", stderr);
+					exit_cleanup();
 					return 1;
 				}
 				encrypt_function = hash_2chan;
@@ -546,6 +639,7 @@ int main(int argc, char **argv)
 
 			case 'h':
 				puts(usage);
+				exit_cleanup();
 				return 0;
 
 			case 'l':
@@ -560,18 +654,37 @@ int main(int argc, char **argv)
 				thread_count = strtol(optarg, NULL, 10);
 				if((thread_count == LONG_MAX) || (thread_count == LONG_MIN))
 				{
-					printf("Invalid thread count: %i\n", (int)thread_count);
+					fprintf(stderr, "Invalid thread count: %i\n", (int)thread_count);
+					exit_cleanup();
 					return 1;
 				}
 				break;
 
+			case 'p':
+				if(progress_filename)
+				{
+					fputs("Progress file may only be specified once.", stderr);
+					exit_cleanup();
+					return 1;
+				}
+				progress_filename = strdup(optarg);
+				break;
+
 			case 's':
+				if(current_tripcode)
+				{
+					fputs("Starting code may only be specified once.", stderr);
+					exit_cleanup();
+					return 1;
+				}
 				current_tripcode = strdup(optarg);
 				current_tripcode_len = strlen(current_tripcode);
+				printf("Using starting code: %s\n", current_tripcode);
 				break;
 
 			default:
 				puts(usage);
+				exit_cleanup();
 				return 1;
 		}
 	}
@@ -600,7 +713,7 @@ int main(int argc, char **argv)
 		}
 		else
 		{
-			puts("Empty string are not valid searching.");
+			fputs("Empty string are not valid searching.", stderr);
 			return 1;
 		}
 	}
@@ -608,7 +721,7 @@ int main(int argc, char **argv)
 	// Sanity check for tripcode count.
 	if(search_tripcode_count <= 0)
 	{
-		printf("Please specify at least one tripcode.\n");
+		fprintf(stderr, "Please specify at least one tripcode.\n");
 		return 1;
 	}
 
@@ -619,10 +732,10 @@ int main(int argc, char **argv)
 	}
 
 	// Print used algo.
-	printf("Using: ");
+	printf("Using algorithm: ");
 	if(encrypt_function == hash_2chan)
 	{
-		puts("2chan algorithm");
+		puts("2chan / 4chan");
 		prepare_search_lookup(search_space_2chan);
 		hash_space_required = 11;
 	}
@@ -656,12 +769,35 @@ int main(int argc, char **argv)
 		tripcode_t *trip = search_tripcodes + ii;
 		if(trip->len >= hash_space_required)
 		{
-			printf("Code %s is %u chars long, too much for current algo (%u).\n",
+			fprintf(stderr,
+					"Code %s is %u chars long, too much for current algo (%u).\n",
 					trip->trip,
 					(unsigned)(trip->len),
 					(unsigned)(hash_space_required - 1));
 			exit_cleanup();
 			return 1;
+		}
+	}
+
+	// Only read current tripcode if it's not yet specified.
+	if(progress_filename)
+	{
+		char *prog = progress_read(progress_filename);
+
+		if(prog)
+		{
+			if(current_tripcode)
+			{
+				fprintf(stderr, "Not overwriting starting code from file: %s\n",
+						prog);
+				free(prog);
+			}
+			else
+			{
+				printf("Using starting code from file: %s\n", prog);
+				current_tripcode = prog;
+				current_tripcode_len = strlen(prog);
+			}
 		}
 	}
 
@@ -692,7 +828,7 @@ int main(int argc, char **argv)
 					NULL);
 		if(err)
 		{
-			printf("ERROR %s\n", strerror(err));
+			fprintf(stderr, "ERROR %s\n", strerror(err));
 			return 1;
 		}
 	}
@@ -716,6 +852,12 @@ int main(int argc, char **argv)
 	pthread_cond_destroy(&term_cond);
 	pthread_mutex_destroy(&hash_mutex);
 	pthread_mutex_destroy(&term_mutex);
+
+	// Must save progress beforew other cleanup.
+	if(progress_filename)
+	{
+		progress_save(progress_filename, current_tripcode);
+	}
 
 	// Current tripcode is not necessarily initialized.
 	if(current_tripcode)

@@ -31,7 +31,8 @@ AC_CHECK_HEADER([openssl/des.h],
 AC_CHECK_LIB([ssl],
 						 [DES_fcrypt],
 						 [],
-						 [openssl=no])
+						 [openssl=no],
+						 [-lcrypto])
 iconv=[yes]
 
 AC_CONFIG_HEADERS([src/config.h])

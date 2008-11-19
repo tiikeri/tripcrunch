@@ -32,10 +32,10 @@ const char *search_space_2chan =
 ////////////////////////////////////////
 
 /** Futallaby salt replace from. */
-static char *futa_fr = "\":;<=>?@[\\]^_`";
+static char *futa_fr = ":;<=>?@[\\]^_`";
 
 /** Futallaby salt replace to. */
-static char *futa_to = "ABCDEFGabcdef.";
+static char *futa_to = "ABCDEFGabcdef";
 
 /** \brief Perform a string replace.
  *
@@ -148,6 +148,8 @@ static char* htmlspecialchars(char *src)
 	src = str_replace(src, "&", "&amp;");
 	src = str_replace(src, "<", "&lt;");
 	src = str_replace(src, ">", "&gt;");
+	src = str_replace(src, "\"", "&quot;");
+	src = str_replace(src, "'", "&#39;");
 	return src;
 }
 
