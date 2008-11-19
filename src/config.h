@@ -47,7 +47,7 @@
 #define PACKAGE "tripcrunch"
 
 /* Define to the address where bug reports for this package should be sent. */
-#define PACKAGE_BUGREPORT "tatu.kilappa_AT_iki.fi"
+#define PACKAGE_BUGREPORT "anonymousofsuomus@gmail.com"
 
 /* Define to the full name of this package. */
 #define PACKAGE_NAME "tripcrunch"

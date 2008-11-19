@@ -502,7 +502,7 @@ s,@PACKAGE_NAME@,|#_!!_#|tripcrunch,g
 s,@PACKAGE_TARNAME@,|#_!!_#|tripcrunch,g
 s,@PACKAGE_VERSION@,|#_!!_#|1.0.0,g
 s,@PACKAGE_STRING@,|#_!!_#|tripcrunch 1.0.0,g
-s,@PACKAGE_BUGREPORT@,|#_!!_#|tatu.kilappa_AT_iki.fi,g
+s,@PACKAGE_BUGREPORT@,|#_!!_#|anonymousofsuomus@|#_!!_#|gmail.com,g
 s,@exec_prefix@,|#_!!_#|${prefix},g
 s,@prefix@,|#_!!_#|/usr/local,g
 s,@program_transform_name@,|#_!!_#|s\,x\,x\,,g
@@ -876,7 +876,7 @@ s,^\([	 #]*\)[^	 ]*\([	 ]*PACKAGE_NAME\)[	 (].*,\1define\2 "tripcrunch" ,
 s,^\([	 #]*\)[^	 ]*\([	 ]*PACKAGE_TARNAME\)[	 (].*,\1define\2 "tripcrunch" ,
 s,^\([	 #]*\)[^	 ]*\([	 ]*PACKAGE_VERSION\)[	 (].*,\1define\2 "1.0.0" ,
 s,^\([	 #]*\)[^	 ]*\([	 ]*PACKAGE_STRING\)[	 (].*,\1define\2 "tripcrunch 1.0.0" ,
-s,^\([	 #]*\)[^	 ]*\([	 ]*PACKAGE_BUGREPORT\)[	 (].*,\1define\2 "tatu.kilappa_AT_iki.fi" ,
+s,^\([	 #]*\)[^	 ]*\([	 ]*PACKAGE_BUGREPORT\)[	 (].*,\1define\2 "anonymousofsuomus@gmail.com" ,
 s,^\([	 #]*\)[^	 ]*\([	 ]*PACKAGE\)[	 (].*,\1define\2 "tripcrunch" ,
 s,^\([	 #]*\)[^	 ]*\([	 ]*VERSION\)[	 (].*,\1define\2 "1.0.0" ,
 s,^\([	 #]*\)[^	 ]*\([	 ]*STDC_HEADERS\)[	 (].*,\1define\2 1 ,
