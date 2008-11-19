@@ -10,6 +10,6 @@ extern const char *search_space_2chan;
  * @param src Source chars.
  * @return Zero on success, nonzero on failure.
  */
-extern char* hash_2chan(const char *src);
+extern char* hash_2chan(char *dst, const char *src);
 
 #endif

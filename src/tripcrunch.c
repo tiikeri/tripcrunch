@@ -88,6 +88,12 @@ static int search_space_size = 0;
 /** Current tripcode. */
 static char *current_tripcode = NULL;
 
+/** Current tripcode length. */
+static size_t current_tripcode_len = 0;
+
+/** Space required for hash space, dependant on the password method. */
+static size_t hash_space_required;
+
 /** Desired tripcode to compare into. */
 static char *desired_tripcode = NULL;
 
@@ -95,7 +101,7 @@ static char *desired_tripcode = NULL;
 size_t desired_tripcode_len = 0;
 
 /** Encrypt function to use. */
-char* (*encrypt_function)(const char*) = NULL;
+char* (*encrypt_function)(char *dst, const char*) = NULL;
 
 /** \brief Signal handler.
  *
@@ -233,14 +239,16 @@ int get_idx_of_char(char cc)
  *
  * Takes as an input a string and jumps n permutations 'forward' in it.
  *
- * Will free() the old string if it's regenerated.
+ * Will free() the old string if it's regenerated. The length pointer will
+ * also be replaced in this case.
  *
  * @param old string.
  * @param jump Jump this many characters forward.
+ * @param len  Length of the string, potentially replaced.
  * @return New string.
  */
-char *enumerate_string(char *old, int jump);
-char *enumerate_string(char *old, int jump)
+char *enumerate_string(char *old, int jump, size_t *len);
+char *enumerate_string(char *old, int jump, size_t *len)
 {
 	// Special case, first jump.
 	if(!old)
@@ -248,9 +256,10 @@ char *enumerate_string(char *old, int jump)
 		int rem = jump % search_space_size;
 		old = str_append(NULL, get_char_at_idx(rem));
 		jump -= rem;
+		*len = 1; // Initially.
 	}
 
-	size_t oldlen = strlen(old);
+	size_t oldlen = *len;
 
 	// Advance forward in the search space.
 	size_t idx = 0;
@@ -280,6 +289,7 @@ char *enumerate_string(char *old, int jump)
 	}
 
 	// Might be changed, might be not.
+	*len = oldlen;
 	return old;
 }
 
@@ -287,15 +297,18 @@ char *enumerate_string(char *old, int jump)
  *
  * This function is used to get a new string, generated from the current one.
  *
- * The string returned from this function must be freed with free() after
- * use.
+ * If dst is too small for the current tripcode, it will be freed and
+ * replaced. Note thet dst MUST be reserved when calling this, even if it's
+ * length specified in len is 0.
  *
  * If this function returns NULL, the caller should stop searching.
  *
- * @return Newly allocated string that is the next one in sequence or NULL.
+ * @param dst Write the current tripcode here.
+ * @param len Length of dst in chars not counting terminating zero.
+ * @return NULL if quitting, otherwise the new tripcode.
  */
-char* get_next_string(void);
-char* get_next_string(void)
+char* get_next_string(char *dst, size_t *len);
+char* get_next_string(char *dst, size_t *len)
 {
 	if(tripcrunch_terminate)
 	{
@@ -303,11 +316,18 @@ char* get_next_string(void)
 	}
 	pthread_mutex_lock(&term_mutex);
 
-	current_tripcode = enumerate_string(current_tripcode, 1);
-	char *ret = strdup(current_tripcode);
+	current_tripcode =
+		enumerate_string(current_tripcode, 1, &current_tripcode_len);
+	if((*len) != current_tripcode_len)
+	{
+		*len = current_tripcode_len;
+		free(dst);
+		dst = (char*)malloc(sizeof(char) * (current_tripcode_len + 1));
+	}
+	memcpy(dst, current_tripcode, sizeof(char) * (current_tripcode_len + 1));
 
 	pthread_mutex_unlock(&term_mutex);
-	return ret;
+	return dst;
 }
 
 /** \brief Test for character equals.
@@ -348,20 +368,33 @@ int char_equals(char lhs, char rhs)
 
 /** \brief Trip cruncher thread function.
  *
- * @param args Arguments to thread.
+ * No arguments currently.
+ *
+ * @param args_not_in_use Not used.
  */
-void* threadfunc_tripcrunch(void *args);
-void* threadfunc_tripcrunch(void *args)
+void* threadfunc_tripcrunch(void*);
+void* threadfunc_tripcrunch(void *args_not_in_use)
 {
 	pthread_mutex_lock(&term_mutex);
 	++threads_running;
 	pthread_mutex_unlock(&term_mutex);
 
-	for(char *trip = get_next_string();
-			(trip != NULL);
-			trip = get_next_string())
+	// Reserve the required space for encryption.
+	char *code = (char*)malloc(sizeof(char) * hash_space_required);
+
+	// Faster to skip one check in inner loop.
+	char *trip = (char*)malloc(sizeof(char) * 1);
+	size_t triplen = 0;
+
+	while(1)
 	{
-		char *code = encrypt_function(trip);
+		char *newtrip = get_next_string(trip, &triplen);
+		if(!newtrip)
+		{
+			break;
+		}
+		trip = newtrip;
+		encrypt_function(code, trip);
 
 		size_t len = strlen(code);
 		unsigned jj = 0;
@@ -381,10 +414,12 @@ void* threadfunc_tripcrunch(void *args)
 				jj = 0;
 			}
 		}
-		free(code);
 		//puts(trip);
-		free(trip);
 	}
+
+	// Code not required anymore.
+	free(code);
+	free(trip);
 
 	pthread_mutex_lock(&term_mutex);
 	--threads_running;
@@ -507,6 +542,7 @@ int main(int argc, char **argv)
 	if(current_tripcode)
 	{
 		current_tripcode = strdup(current_tripcode);
+		current_tripcode_len = strlen(current_tripcode);
 	}
 
 	// If no algo selected yet, pick 2chan.
@@ -521,6 +557,7 @@ int main(int argc, char **argv)
 	{
 		puts("2chan algorithm");
 		prepare_search_lookup(search_space_2chan);
+		hash_space_required = 11;
 	}
 	else
 	{
@@ -531,7 +568,8 @@ int main(int argc, char **argv)
 	// If generate trip requested, do it and exit.
 	if(gentrip)
 	{
-		char *enc = encrypt_function(gentrip);
+		char *enc = (char*)malloc(sizeof(char) * hash_space_required);
+		encrypt_function(enc, gentrip);
 		printf("Password %s encrypts to tripcode %s\n", gentrip, enc);
 		free(enc);
 		return 0;
@@ -562,13 +600,11 @@ int main(int argc, char **argv)
 		(pthread_t*)malloc(sizeof(pthread_t) * (unsigned)thread_count);
 	for(int ii = 0; (ii < thread_count); ++ii)
 	{
-		int *targs = (int*)malloc(sizeof(int));
-		*targs = ii;
 		int err =
 			pthread_create(threads + ii,
 					NULL,
 					threadfunc_tripcrunch,
-					targs);
+					NULL);
 		if(err)
 		{
 			printf("ERROR %s\n", strerror(err));

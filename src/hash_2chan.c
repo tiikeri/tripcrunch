@@ -155,7 +155,7 @@ static char* htmlspecialchars(char *src)
 // Extern //////////////////////////////
 ////////////////////////////////////////
 
-char* hash_2chan(const char *src)
+char* hash_2chan(char *dst, const char *src)
 {
 	char salt[3] = { 'H', '.', 0 };
 
@@ -212,8 +212,9 @@ char* hash_2chan(const char *src)
 	// Crypt the source and return a clone of essential data.
 	char enc[15]; // Should always be enough.
 	DES_fcrypt(str, salt, enc);
-	char *ret = strdup(enc + (strlen(enc) - 10));
-	return ret;
+	memcpy(dst, enc + (strlen(enc) - 10), 11);
+	free(str);
+	return dst;
 }
 
 ////////////////////////////////////////
