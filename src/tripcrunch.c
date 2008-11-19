@@ -660,6 +660,7 @@ int main(int argc, char **argv)
 					trip->trip,
 					(unsigned)(trip->len),
 					(unsigned)(hash_space_required - 1));
+			exit_cleanup();
 			return 1;
 		}
 	}
