@@ -383,6 +383,49 @@ int char_equals(char lhs, char rhs)
 	return 0;
 }
 
+/** \brief Test a tripcode against all searched codes.
+ *
+ * @param trip Tripcode searched.
+ * @param code Space for testing.
+ * @param stream Stream to print the match in.
+ * @return Number of matches found or zero.
+ */
+int test_trip(char *trip, char *code, FILE *stream);
+int test_trip(char *trip, char *code, FILE *stream)
+{
+	int ret = 0;
+
+	// Perform the encryption.
+	encrypt_function(code, trip);
+	
+	// Look for matches.
+	size_t len = strlen(code);
+	for(size_t kk = 0; (kk < search_tripcode_count); ++kk)
+	{
+		char *desired_tripcode = search_tripcodes[kk].trip;
+		size_t desired_tripcode_len = search_tripcodes[kk].len;
+		size_t jj = 0;
+		for(size_t ii = 0; (ii < len); ++ii)
+		{
+			if(char_equals(code[ii], desired_tripcode[jj]))
+			{
+				++jj;
+				if(jj >= desired_tripcode_len)
+				{
+					fprintf(stream, "Match: %s encrypts to trip %s\n", trip, code);
+					break;
+				}
+			}
+			else
+			{
+				jj = 0;
+			}
+		}
+	}
+
+	return ret;
+}
+
 /** \brief Trip cruncher thread function.
  *
  * No arguments currently.
@@ -397,7 +440,7 @@ void* threadfunc_tripcrunch(void *args_not_in_use)
 	pthread_mutex_unlock(&term_mutex);
 
 	// Reserve the required space for encryption.
-	char *code = (char*)malloc(sizeof(char) * hash_space_required);
+	char *enc = (char*)malloc(sizeof(char) * hash_space_required);
 
 	// Faster to skip one check in inner loop.
 	char *trip = (char*)malloc(sizeof(char) * 1);
@@ -411,36 +454,13 @@ void* threadfunc_tripcrunch(void *args_not_in_use)
 			break;
 		}
 		trip = newtrip;
-		encrypt_function(code, trip);
 
-		size_t len = strlen(code);
-		for(size_t kk = 0; (kk < search_tripcode_count); ++kk)
-		{
-			char *desired_tripcode = search_tripcodes[kk].trip;
-			size_t desired_tripcode_len = search_tripcodes[kk].len;
-			size_t jj = 0;
-			for(size_t ii = 0; (ii < len); ++ii)
-			{
-				if(char_equals(code[ii], desired_tripcode[jj]))
-				{
-					++jj;
-					if(jj >= desired_tripcode_len)
-					{
-						printf("Match: %s encrypts to trip %s\n", trip, code);
-						break;
-					}
-				}
-				else
-				{
-					jj = 0;
-				}
-			}
-		}
+		test_trip(trip, enc, stdout);
 		//puts(trip);
 	}
 
-	// Code not required anymore.
-	free(code);
+	// Codes not required anymore.
+	free(enc);
 	free(trip);
 
 	pthread_mutex_lock(&term_mutex);
@@ -642,6 +662,14 @@ int main(int argc, char **argv)
 					(unsigned)(hash_space_required - 1));
 			return 1;
 		}
+	}
+
+	// Try the initial tripcode if it has been specified.
+	if(current_tripcode)
+	{
+		char *enc = (char*)malloc(sizeof(char) * hash_space_required);
+		test_trip(current_tripcode, enc, stdout);
+		free(enc);
 	}
 
 	signal(SIGINT, tripcrunch_signal_handler);
