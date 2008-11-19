@@ -70,8 +70,11 @@ static const char usage[] =
 "  -2, --2chan                          Search using the 2chan algorithm.\n"
 "                                       (default).\n"
 "  -b, --benchmark                      Display rudimentary benchmarks.\n"
+"  -c, --enable-case                    Perform tests case sensitive.\n"
+"                                       (default: case insensitive).\n"
 "  -h, --help                           Print this help.\n"
 "  -l, --enable-leet                    Enable leetspeak in comparisons.\n"
+"                                       (default: no)\n"
 "  -g, --generate                       Generate tripcodes instead of search.\n\n"
 "Command line options with arguments:\n"
 "  -n <num>, --nthreads=<num>           Number of threads to use.\n"
@@ -101,9 +104,6 @@ static int64_t benchmark_start;
 
 /** Benchmark starting time. */
 static int64_t benchmark_end;
-
-/** Leet flag. */
-static int enable_leet = 0;
 
 /** Thread count. */
 static long int thread_count = 1;
@@ -139,7 +139,10 @@ static size_t search_tripcode_count = 0;
 static char *progress_filename = NULL;
 
 /** Encrypt function to use. */
-char* (*encrypt_function)(char *dst, const char*) = NULL;
+char* (*encrypt_function)(char*, const char*) = NULL;
+
+/** Lowerifier function. */
+char (*char_transform)(char) = NULL;
 
 ////////////////////////////////////////
 // Local function //////////////////////
@@ -469,40 +472,100 @@ char* get_next_string(char *dst, size_t *len)
 	return dst;
 }
 
-/** \brief Test for character equals.
+/** \brief Transform character (case sensitive, no leet).
  *
- * @param lhs Left-hand-side comparison.
- * @param rhs Right-hand-side comparison.
- * @return 1 if sufficently equal, 0 if not.
+ * @param src Source character.
+ * @return Transformed character.
  */
-int char_equals(char lhs, char rhs);
-int char_equals(char lhs, char rhs)
+char char_transform_identity(char src);
+char char_transform_identity(char src)
 {
-	int llhs = tolower(lhs),
-			lrhs = tolower(rhs);
-	if(llhs == lrhs)
-	{
-		return 1;
-	}
+	return src;
+}
 
-	if(enable_leet &&
-			(((llhs == '5') && (lrhs == 's')) ||
-			 ((llhs == 's') && (lrhs == '5')) ||
-			 ((llhs == '4') && (lrhs == 'a')) ||
-			 ((llhs == 'a') && (lrhs == '4')) ||
-			 ((llhs == '0') && (lrhs == 'o')) ||
-			 ((llhs == 'o') && (lrhs == '0')) ||
-			 ((llhs == '7') && (lrhs == 'T')) ||
-			 ((llhs == 'T') && (lrhs == '7')) ||
-			 ((llhs == '1') && (lrhs == 'i')) ||
-			 ((llhs == 'i') && (lrhs == '1')) ||
-			 ((llhs == '3') && (lrhs == 'e')) ||
-			 ((llhs == 'e') && (lrhs == '3'))))
+/** \brief Transform character (case insensitive, no leet).
+ *
+ * @param src Source character.
+ * @return Transformed character.
+ */
+char char_transform_nocase(char src);
+char char_transform_nocase(char src)
+{
+	return (char)tolower(src);
+}
+
+/** \brief Transform character (leet).
+ *
+ * @param src Source character.
+ * @return Transformed character.
+ */
+char char_transform_leet(char src);
+char char_transform_leet(char src)
+{
+	switch(src)
 	{
-		return 1;
+		case '1':
+			return 'I';
+
+		case '2':
+			return 'Z';
+
+		case '3':
+			return 'E';
+
+		case '4':
+			return 'A';
+
+		case '5':
+			return 'S';
+
+		case '7':
+			return 'T';
+
+		case '0':
+			return 'O';
+
+		default:
+			return src;
 	}
-	
-	return 0;
+}
+
+/** \brief Transform character (case insensitive, leet).
+ *
+ * @param src Source character.
+ * @return Transformed character.
+ */
+char char_transform_nocase_leet(char src);
+char char_transform_nocase_leet(char src)
+{
+	src = (char)tolower(src);
+
+	switch(src)
+	{
+		case '1':
+			return 'i';
+
+		case '2':
+			return 'z';
+
+		case '3':
+			return 'e';
+
+		case '4':
+			return 'a';
+
+		case '5':
+			return 's';
+
+		case '7':
+			return 't';
+
+		case '0':
+			return 'o';
+
+		default:
+			return src;
+	}
 }
 
 /** \brief Test a tripcode against all searched codes.
@@ -529,7 +592,7 @@ int test_trip(char *trip, char *code, FILE *stream)
 		size_t jj = 0;
 		for(size_t ii = 0; (ii < len); ++ii)
 		{
-			if(char_equals(code[ii], desired_tripcode[jj]))
+			if(char_transform(code[ii]) == desired_tripcode[jj])
 			{
 				++jj;
 				if(jj >= desired_tripcode_len)
@@ -639,6 +702,7 @@ int main(int argc, char **argv)
 	{
 		{	"2chan", no_argument, NULL, '2' },
 		{	"benchmark", no_argument, NULL, 'h' },
+		{	"enable-case", no_argument, NULL, 'c' },
 		{	"help", no_argument, NULL, 'h' },
 		{	"enable-leet", no_argument, NULL, 'l' },
 		{	"generate", no_argument, NULL, 'g' },
@@ -647,10 +711,12 @@ int main(int argc, char **argv)
 		{	"start-from", required_argument, NULL, 's' },
 		{ NULL, 0, 0, 0 }
 	};
-	static const char *opts_short = "2bhlgn:p:s:";
+	static const char *opts_short = "2cbhlgn:p:s:";
 
 	// Local args.
-	int enable_generate = 0;
+	int enable_generate = 0,
+			enable_leet = 0,
+			enable_case = 0;
 
 	while(1)
 	{
@@ -676,6 +742,10 @@ int main(int argc, char **argv)
 
 			case 'b':
 				flag_print_benchmarks = 1;
+				break;
+
+			case 'c':
+				enable_case = 1;
 				break;
 
 			case 'h':
@@ -786,6 +856,29 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
+	// Decide character transform.
+	printf("Using character transform: ");
+	if(enable_case && enable_leet)
+	{
+		char_transform = char_transform_leet;
+		puts("1337");
+	}
+	else if(enable_case)
+	{
+		char_transform = char_transform_identity;
+		puts("none");
+	}
+	else if(enable_leet)
+	{
+		char_transform = char_transform_nocase_leet;
+		puts("case insensitive, 1337");
+	}
+	else
+	{
+		char_transform = char_transform_nocase;
+		puts("case insensitive");
+	}
+
 	// If generate trip requested, do it and exit.
 	if(enable_generate)
 	{
@@ -817,6 +910,12 @@ int main(int argc, char **argv)
 					(unsigned)(hash_space_required - 1));
 			exit_cleanup();
 			return 1;
+		}
+
+		// Perform case transform in precalc!
+		for(size_t jj = 0; (jj < trip->len); ++jj)
+		{
+			trip->trip[jj] = char_transform(trip->trip[jj]);
 		}
 	}
 

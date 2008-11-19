@@ -1,4 +1,4 @@
-AC_INIT([tripcrunch], [1.0.0], [tatu.kilappa_AT_iki.fi], [tripcrunch])
+AC_INIT([tripcrunch], [1.0.0], [anonymousofsuomus@gmail.com], [tripcrunch])
 
 AC_CANONICAL_BUILD
 AC_CANONICAL_HOST
@@ -28,6 +28,10 @@ AC_CHECK_LIB([pthread],
 AC_CHECK_HEADER([openssl/des.h],
 								[openssl=yes],
 								[openssl=no])
+AC_CHECK_LIB([crypto],
+						 [CRYPTO_malloc],
+						 [],
+						 [openssl=no])
 AC_CHECK_LIB([ssl],
 						 [DES_fcrypt],
 						 [],
@@ -43,7 +47,7 @@ AC_MSG_CHECKING([if build is possible])
 if test x$pthread == xno ; then
 	AC_MSG_ERROR([pthread not found])
 fi
-if test x$crypt == xno ; then
+if test x$openssl == xno ; then
 	AC_MSG_ERROR([openssl DES_fcrypt() not found])
 fi
 if test x$iconv == xno ; then
@@ -62,6 +66,7 @@ echo "
 Configuration for $PACKAGE_TARNAME $PACKAGE_VERSION:
 	Enable debug:             $TRIPCRUNCH_DEBUG
 	Enable optimizations:     $optimizations
+	Compiler:                 $CC
 	Compiler flags:           $CFLAGS
 	Linker flags:             $LDFLAGS
 	Libs:                     $LIBS

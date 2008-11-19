@@ -93,38 +93,42 @@ dnl Check if given C compiler flag is approperiate and include if yes.
 dnl AC_CHECK_CCFLAG([FLAG])
 AC_DEFUN([AC_CHECK_CCFLAG],
 [
-	AC_LANG_PUSH([C])
-	AC_MSG_CHECKING([if $CC accepts $1])
-	CFLAGS_save=[$CFLAGS]
-	AC_ADD_CCFLAG([$1])
-	AC_TRY_COMPILE([],
-		[],
-		flag=[yes],
-		flag=[no])
-	if test x$flag == xno ; then
-		CFLAGS="$CFLAGS_save"
+	if test "x$CC" != x ; then
+		AC_LANG_PUSH([C])
+		AC_MSG_CHECKING([if $CC accepts $1])
+		CFLAGS_save=[$CFLAGS]
+		AC_ADD_CCFLAG([$1])
+		AC_TRY_COMPILE([],
+			[],
+			flag=[yes],
+			flag=[no])
+		if test x$flag == xno ; then
+			CFLAGS="$CFLAGS_save"
+		fi
+		AC_MSG_RESULT([$flag])
+		AC_LANG_POP([C])
 	fi
-	AC_MSG_RESULT([$flag])
-	AC_LANG_POP([C])
 ])
 
 dnl Check if given C++ compiler flag is approperiate and include if yes.
 dnl AC_CHECK_CXXFLAG([flag])
 AC_DEFUN([AC_CHECK_CXXFLAG],
 [
-	AC_LANG_PUSH([C++])
-	AC_MSG_CHECKING([if $CXX accepts $1])
-	CXXFLAGS_save=[$CXXFLAGS]
-	AC_ADD_CXXFLAG([$1])
-	AC_TRY_COMPILE([],
-		[],
-		flag=[yes],
-		flag=[no])
-	if test x$flag == xno ; then
-		CXXFLAGS="$CXXFLAGS_save"
+	if test "x$CXX" != x ; then
+		AC_LANG_PUSH([C++])
+		AC_MSG_CHECKING([if $CXX accepts $1])
+		CXXFLAGS_save=[$CXXFLAGS]
+		AC_ADD_CXXFLAG([$1])
+		AC_TRY_COMPILE([],
+			[],
+			flag=[yes],
+			flag=[no])
+		if test x$flag == xno ; then
+			CXXFLAGS="$CXXFLAGS_save"
+		fi
+		AC_MSG_RESULT([$flag])
+		AC_LANG_POP([C++])
 	fi
-	AC_MSG_RESULT([$flag])
-	AC_LANG_POP([C++])
 ])
 
 dnl Check if given C++ compiler flag produces runnable code.
