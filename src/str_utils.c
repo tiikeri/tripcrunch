@@ -371,10 +371,10 @@ char* htmlspecialchars(char *src)
 		{ '&', "&amp;", 5 },
 		{ '<', "&lt;", 4 },
 		{ '>', "&gt;", 4 },
-		{ '"', "&quot;", 6 },
-		{ '\'', "&39;", 5 }
+		{ '"', "&quot;", 6 }
+		//{ '\'', "&39;", 5 } // This replace is not used,
 	};
-	static const size_t htmlspecialchar_replace_count = 5;
+	static const size_t htmlspecialchar_replace_count = 4;
 	return str_multireplace(src,
 			htmlspecialchar_replaces,
 			htmlspecialchar_replace_count);
