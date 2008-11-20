@@ -48,7 +48,8 @@ CONFIG_CLEAN_FILES =
 am__installdirs = "$(DESTDIR)$(bindir)"
 binPROGRAMS_INSTALL = $(INSTALL_PROGRAM)
 PROGRAMS = $(bin_PROGRAMS)
-am_tripcrunch_OBJECTS = hash_2chan.$(OBJEXT) tripcrunch.$(OBJEXT)
+am_tripcrunch_OBJECTS = hash_2chan.$(OBJEXT) str_utils.$(OBJEXT) \
+	tripcrunch.$(OBJEXT)
 tripcrunch_OBJECTS = $(am_tripcrunch_OBJECTS)
 tripcrunch_LDADD = $(LDADD)
 DEFAULT_INCLUDES = -I.@am__isrc@
@@ -184,6 +185,7 @@ target_vendor = @target_vendor@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 tripcrunch_SOURCES = hash_2chan.c \
+										 str_utils.c \
 										 tripcrunch.c
 
 all: config.h
@@ -276,6 +278,7 @@ distclean-compile:
 	-rm -f *.tab.c
 
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/hash_2chan.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/str_utils.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/tripcrunch.Po@am__quote@
 
 .c.o:

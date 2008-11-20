@@ -9,18 +9,12 @@
  */
 
 ////////////////////////////////////////
-// Define //////////////////////////////
-////////////////////////////////////////
-
-/** Maximum ASCII ordinal in search strings. */
-#define SEARCH_MAX_ORD 128
-
-////////////////////////////////////////
 // Include /////////////////////////////
 ////////////////////////////////////////
 
 #include "config.h"
 #include "hash_2chan.h"
+#include "str_utils.h"
 #include "tripcrunch.h"
 
 #include <ctype.h>
@@ -30,7 +24,6 @@
 #include <limits.h>
 #include <signal.h>
 #include <stdlib.h>
-#include <stdio.h>
 #include <string.h>
 #include <sys/time.h>
 #include <time.h>
@@ -111,15 +104,6 @@ static long int thread_count = 1;
 /** Current thread count. */
 static int threads_running = 0;
 
-/** Lookup table for transformations. */
-static int *search_lookup;
-
-/** Search space to use. */
-static const char *search_space;
-
-/** Search space size. */
-static int search_space_size = 0;
-
 /** Current tripcode. */
 static char *current_tripcode = NULL;
 
@@ -183,8 +167,8 @@ static void tripcrunch_signal_handler(int signum)
  * @param filename File to read.
  * @return Tripcode read or NULL.
  */
-char* progress_read(const char *filename);
-char* progress_read(const char *filename)
+static char* progress_read(const char *filename);
+static char* progress_read(const char *filename)
 {
 	FILE *pfile = fopen(filename, "r");
 	if(!pfile)
@@ -231,8 +215,8 @@ char* progress_read(const char *filename)
  *
  * @return Current time in microseconds.
  */
-int64_t get_current_time_int64(void);
-int64_t get_current_time_int64(void)
+static int64_t get_current_time_int64(void);
+static int64_t get_current_time_int64(void)
 {
 	struct timeval tv;
 
@@ -246,8 +230,8 @@ int64_t get_current_time_int64(void)
  * @param filename File to write.
  * @param trip Tripcode to save.
  */
-void progress_save(const char *filename, char *trip);
-void progress_save(const char *filename, char *trip)
+static void progress_save(const char *filename, char *trip);
+static void progress_save(const char *filename, char *trip)
 {
 	if(!trip || (strlen(trip) <= 0))
 	{
@@ -268,170 +252,6 @@ void progress_save(const char *filename, char *trip)
 	fclose(pfile);
 }
 
-/** \brief Append to string.
- *
- * Generates a new string with the given character at the end.
- *
- * Deletes previous string if non-null.
- *
- * @param old Old string.
- * @param chr ASCII number of character to append.
- * @return New string.
- */
-char* str_append(char *old, int chr);
-char* str_append(char *old, int chr)
-{
-	if(!old)
-	{
-		char *ret = (char*)malloc(sizeof(char) * 2);
-		ret[0] = (char)chr;
-		ret[1] = 0;
-		return ret;
-	}
-
-	size_t len = strlen(old);
-	char *ret = (char*)malloc((len + 2) * sizeof(char));
-	memcpy(ret, old, len);
-	ret[len]  = (char)chr;
-	ret[len + 1] = 0;
-	free(old);
-	return ret;
-}
-
-/** \brief Prepare search lookup table.
- *
- * @param space Search space to use.
- */
-void prepare_search_lookup(const char *space);
-void prepare_search_lookup(const char *space)
-{
-	search_space = space;
-	search_space_size = (int)strlen(space);
-	search_lookup = (int*)malloc(sizeof(int) * SEARCH_MAX_ORD);
-
-	for(unsigned ii = 0; (ii < SEARCH_MAX_ORD); ++ii)
-	{
-		if(ii <= 0x20)
-		{
-			search_lookup[ii] = -1;
-		}
-		else
-		{
-			char *ptr = strchr(space, (int)ii);
-			search_lookup[ii] = ptr ? ((int)(ptr - space)) : -1;
-		}
-#ifdef TRIPCRUNCH_DEBUG
-		printf("Search_lookup[%3i] : %c = %i\n", ii, ii, (int)search_lookup[ii]);
-#endif
-	}
-}
-
-/** \brief Get character at a given index in the search space.
- *
- * @param idx Index to fetch from.
- * @return Character found.
- */
-char get_char_at_idx(int idx);
-char get_char_at_idx(int idx)
-{
-#ifdef TRIPCRUNCH_DEBUG
-	if((idx < 0) || ((unsigned)idx >= search_space_size))
-	{
-		printf("ERROR, search space index out of range");
-		exit(1);
-	}
-#endif
-
-	return search_space[idx];
-}
-
-/** \brief Get the index of a character.
- *
- * @param cc Character.
- * @return Index of that character in the search space.
- */
-int get_idx_of_char(char cc);
-int get_idx_of_char(char cc)
-{
-	int idx = (int)cc;
-
-#ifdef TRIPCRUNCH_DEBUG
-	if((idx < 0) || ((unsigned)idx >= SEARCH_MAX_ORD))
-	{
-		printf("ERROR, search space char out of range");
-		exit(1);
-	}
-#endif
-
-	int ret = search_lookup[idx];
-#ifdef TRIPCRUNCH_DEBUG
-	if(ret < 0)
-	{
-		printf("ERROR, invalid search space char: %c", cc);
-		exit(1);
-	}
-#endif
-	return ret;
-}
-
-/** \brief Enumerate string.
- *
- * Takes as an input a string and jumps n permutations 'forward' in it.
- *
- * Will free() the old string if it's regenerated. The length pointer will
- * also be replaced in this case.
- *
- * @param old string.
- * @param jump Jump this many characters forward.
- * @param len  Length of the string, potentially replaced.
- * @return New string.
- */
-char *enumerate_string(char *old, int jump, size_t *len);
-char *enumerate_string(char *old, int jump, size_t *len)
-{
-	// Special case, first jump.
-	if(!old)
-	{
-		int rem = jump % search_space_size;
-		old = str_append(NULL, get_char_at_idx(rem));
-		jump -= rem;
-		*len = 1; // Initially.
-	}
-
-	size_t oldlen = *len;
-
-	// Advance forward in the search space.
-	size_t idx = 0;
-	while(jump)
-	{
-		if(idx >= oldlen)
-		{
-#ifdef TRIPCRUNCH_DEBUG
-			if(jump <= 0)
-			{
-				printf("ERROR, jump should always be > 0 when appending\n");
-				exit(1);
-			}
-#endif
-			int rem = (jump - 1) % search_space_size;
-			old = str_append(old, get_char_at_idx(rem));
-			oldlen += 1;
-		}
-		else
-		{
-			jump = jump + get_idx_of_char(old[idx]);
-			int rem = jump % search_space_size;
-			old[idx] = get_char_at_idx(rem);
-		}
-		jump = jump / search_space_size;
-		++idx;
-	}
-
-	// Might be changed, might be not.
-	*len = oldlen;
-	return old;
-}
-
 /** \brief Get a new string in a critical section.
  *
  * This function is used to get a new string, generated from the current one.
@@ -446,8 +266,8 @@ char *enumerate_string(char *old, int jump, size_t *len)
  * @param len Length of dst in chars not counting terminating zero.
  * @return NULL if quitting, otherwise the new tripcode.
  */
-char* get_next_string(char *dst, size_t *len);
-char* get_next_string(char *dst, size_t *len)
+static char* get_next_string(char *dst, size_t *len);
+static char* get_next_string(char *dst, size_t *len)
 {
 	if(flag_tripcrunch_terminate)
 	{
@@ -455,8 +275,10 @@ char* get_next_string(char *dst, size_t *len)
 	}
 	pthread_mutex_lock(&term_mutex);
 
+	// TODO: replace str_enumerate_n with a simpler enumeration that only moves
+	// one character forward.
 	current_tripcode =
-		enumerate_string(current_tripcode, 1, &current_tripcode_len);
+		str_enumerate_n(current_tripcode, 1, &current_tripcode_len);
 	if((*len) != current_tripcode_len)
 	{
 		*len = current_tripcode_len;
@@ -477,8 +299,8 @@ char* get_next_string(char *dst, size_t *len)
  * @param src Source character.
  * @return Transformed character.
  */
-char char_transform_identity(char src);
-char char_transform_identity(char src)
+static char char_transform_identity(char src);
+static char char_transform_identity(char src)
 {
 	return src;
 }
@@ -488,8 +310,8 @@ char char_transform_identity(char src)
  * @param src Source character.
  * @return Transformed character.
  */
-char char_transform_nocase(char src);
-char char_transform_nocase(char src)
+static char char_transform_nocase(char src);
+static char char_transform_nocase(char src)
 {
 	return (char)tolower(src);
 }
@@ -499,8 +321,8 @@ char char_transform_nocase(char src)
  * @param src Source character.
  * @return Transformed character.
  */
-char char_transform_leet(char src);
-char char_transform_leet(char src)
+static char char_transform_leet(char src);
+static char char_transform_leet(char src)
 {
 	switch(src)
 	{
@@ -535,8 +357,8 @@ char char_transform_leet(char src)
  * @param src Source character.
  * @return Transformed character.
  */
-char char_transform_nocase_leet(char src);
-char char_transform_nocase_leet(char src)
+static char char_transform_nocase_leet(char src);
+static char char_transform_nocase_leet(char src)
 {
 	src = (char)tolower(src);
 
@@ -575,8 +397,8 @@ char char_transform_nocase_leet(char src)
  * @param stream Stream to print the match in.
  * @return Number of matches found or zero.
  */
-int test_trip(char *trip, char *code, FILE *stream);
-int test_trip(char *trip, char *code, FILE *stream)
+static int test_trip(char *trip, char *code, FILE *stream);
+static int test_trip(char *trip, char *code, FILE *stream)
 {
 	int ret = 0;
 
@@ -617,8 +439,8 @@ int test_trip(char *trip, char *code, FILE *stream)
  *
  * @param args_not_in_use Not used.
  */
-void* threadfunc_tripcrunch(void*);
-void* threadfunc_tripcrunch(void *args_not_in_use)
+static void* threadfunc_tripcrunch(void*);
+static void* threadfunc_tripcrunch(void *args_not_in_use)
 {
 	pthread_mutex_lock(&term_mutex);
 	++threads_running;
@@ -657,8 +479,8 @@ void* threadfunc_tripcrunch(void *args_not_in_use)
 
 /** \brief Free all reserved global memory.
  */
-void exit_cleanup(void);
-void exit_cleanup(void)
+static void exit_cleanup(void);
+static void exit_cleanup(void)
 {
 	if(search_tripcodes)
 	{
@@ -679,10 +501,7 @@ void exit_cleanup(void)
 		free(progress_filename);
 	}
 
-	if(search_lookup)
-	{
-		free(search_lookup);
-	}
+	str_enumerate_free();
 }
 
 ////////////////////////////////////////
@@ -847,7 +666,7 @@ int main(int argc, char **argv)
 	if(encrypt_function == hash_2chan)
 	{
 		puts("2chan / 4chan");
-		prepare_search_lookup(search_space_2chan);
+		str_enumerate_init(search_space_2chan);
 		hash_space_required = 11;
 	}
 	else
