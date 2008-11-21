@@ -102,11 +102,9 @@ static char* str_append(char *old, int chr)
 	}
 
 	size_t len = strlen(old);
-	char *ret = (char*)malloc((len + 2) * sizeof(char));
-	memcpy(ret, old, len);
+	char *ret = (char*)realloc(old,  sizeof(char) * (len + 2));
 	ret[len]  = (char)chr;
 	ret[len + 1] = 0;
-	free(old);
 	return ret;
 }
 
@@ -316,7 +314,8 @@ char* str_replace(char *src, const char *needle, const char *replacement)
 		return src;
 	}
 	
-	char *ret = (char*)malloc(sizeof(char) * len - nlen * nnum + rlen * nnum + 1);
+	char *ret =
+		(char*)malloc(sizeof(char) * (len - nlen * nnum + rlen * nnum + 1));
 
 	jj = 0;
 	size_t kk = 0;
