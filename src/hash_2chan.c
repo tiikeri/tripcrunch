@@ -12,10 +12,10 @@
 // Include /////////////////////////////
 ////////////////////////////////////////
 
-#include "config.h"
+#include "tripcrunch.h"
+
 #include "hash_2chan.h"
 #include "str_utils.h"
-#include "tripcrunch.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -44,7 +44,7 @@ static char *futa_to = "ABCDEFGabcdef";
 // Extern //////////////////////////////
 ////////////////////////////////////////
 
-char* hash_2chan(char *dst, const char *src)
+char* hash_2chan(char *dst, const char *src, size_t srclen)
 {
 	char salt[3] = { 'H', '.', 0 };
 
@@ -54,9 +54,8 @@ char* hash_2chan(char *dst, const char *src)
 	}
 
 	// Need a duplicate for htmlspecialchars.
-	char *str = strdup(src);
-	str = htmlspecialchars(str);
-	size_t slen = strlen(str);
+	size_t slen = srclen;
+	char *str = htmlspecialchars((char*)memdup(src, srclen + 1), &slen);
 
 	if(slen <= 0)
 	{
@@ -99,9 +98,9 @@ char* hash_2chan(char *dst, const char *src)
 	}
 
 	// Crypt the source and return a clone of essential data.
-	char enc[15]; // Should always be enough.
+	char enc[14]; // DES result size is always 13 characters.
 	DES_fcrypt(str, salt, enc);
-	memcpy(dst, enc + (strlen(enc) - 10), 11);
+	memcpy(dst, enc + 3, 11); 
 	free(str);
 	return dst;
 }

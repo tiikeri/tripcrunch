@@ -9,7 +9,8 @@
 // Include /////////////////////////////
 ////////////////////////////////////////
 
-#include "config.h"
+#include "tripcrunch.h"
+
 #include "str_utils.h"
 
 #include <stdlib.h>
@@ -28,6 +29,19 @@ static int search_space_size = 0;
 /** Lookup table for transformations. */
 static int *search_lookup = NULL;
 
+/** htmlspecialchars replace table. */
+static const char_replace_t htmlspecialchars_replaces[] =
+{
+	{ '&', "&amp;", 5 },
+	{ '<', "&lt;", 4 },
+	{ '>', "&gt;", 4 },
+	{ '"', "&quot;", 6 }
+	//{ '\'', "&39;", 5 } // This replace is not used,
+};
+
+/** htmlspecialchars replace table size. */
+static const size_t htmlspecialchars_replace_count = 4;
+
 ////////////////////////////////////////
 // Local function //////////////////////
 ////////////////////////////////////////
@@ -37,11 +51,11 @@ static int *search_lookup = NULL;
  * @param idx Index to fetch from.
  * @return Character found.
  */
-static char search_lookup_forward(int idx);
-static char search_lookup_forward(int idx)
+static inline char search_lookup_forward(int idx);
+static inline char search_lookup_forward(int idx)
 {
 #ifdef TRIPCRUNCH_DEBUG
-	if((idx < 0) || ((unsigned)idx >= search_space_size))
+	if((idx < 0) || (idx >= search_space_size))
 	{
 		printf("ERROR, search space index out of range");
 		exit(1);
@@ -56,8 +70,8 @@ static char search_lookup_forward(int idx)
  * @param cc Character.
  * @return Index of that character in the search space.
  */
-static int search_lookup_backward(char cc);
-static int search_lookup_backward(char cc)
+static inline int search_lookup_backward(char cc);
+static inline int search_lookup_backward(char cc)
 {
 	int idx = (int)cc;
 
@@ -84,33 +98,34 @@ static int search_lookup_backward(char cc)
  *
  * Generates a new string with the given character at the end.
  *
- * Deletes previous string if non-null.
+ * Deletes previous string.
+ *
+ * Do not call with an old string that is not initialized.
  *
  * @param old Old string.
+ * @param oldlen Old string length.
  * @param chr ASCII number of character to append.
  * @return New string.
  */
-static char* str_append(char *old, int chr);
-static char* str_append(char *old, int chr)
+static char* str_append(char *old, size_t oldlen, int chr);
+static char* str_append(char *old, size_t oldlen, int chr)
 {
-	if(!old)
-	{
-		char *ret = (char*)malloc(sizeof(char) * 2);
-		ret[0] = (char)chr;
-		ret[1] = 0;
-		return ret;
-	}
-
-	size_t len = strlen(old);
-	char *ret = (char*)realloc(old,  sizeof(char) * (len + 2));
-	ret[len]  = (char)chr;
-	ret[len + 1] = 0;
+	char *ret = (char*)realloc(old,  sizeof(char) * (oldlen + 2));
+	ret[oldlen]  = (char)chr;
+	ret[oldlen + 1] = 0;
 	return ret;
 }
 
 ////////////////////////////////////////
 // Extern //////////////////////////////
 ////////////////////////////////////////
+
+void* memdup(const void *src, size_t len)
+{
+	void *ret = malloc(len);
+	memcpy(ret, src, len);
+	return ret;
+}
 
 int str_enumerate_init(const char *sspace)
 {
@@ -157,15 +172,56 @@ void str_enumerate_free(void)
 	}
 }
 
-char *str_enumerate_n(char *old, int jump, size_t *len)
+char* str_enumerate_1(char *old, size_t *len)
+{
+	// Special case, first jump.
+	if(!old)
+	{
+		char *ret = (char*)malloc(sizeof(char) * 2);
+		ret[0] = search_lookup_forward(0);
+		ret[1] = 0;
+		*len = 1;
+		return ret;
+	}
+
+	size_t oldlen = *len,
+				 ii = 0;
+
+	for(;;)
+	{
+		char cc = old[ii];
+		int idx = search_lookup_backward(cc);
+
+		if(idx + 1 >= search_space_size)
+		{
+			old[ii] = search_lookup_forward(0);
+		}
+		else
+		{
+			old[ii] = search_lookup_forward(idx + 1);
+			return old;
+		}
+
+		if(ii + 1 >= oldlen)
+		{
+			*len = oldlen + 1;
+			return str_append(old, oldlen, search_lookup_forward(0));
+		}
+		++ii;
+	}
+}
+
+char* str_enumerate_n(char *old, int jump, size_t *len)
 {
 	// Special case, first jump.
 	if(!old)
 	{
 		int rem = jump % search_space_size;
-		old = str_append(NULL, search_lookup_forward(rem));
+		old = (char*)malloc(sizeof(char) * 2);
+		old[0] = search_lookup_forward(rem);
+		old[1] = 0;
+		*len = 1;
 		jump -= rem;
-		*len = 1; // Initially.
 	}
 
 	size_t oldlen = *len;
@@ -184,7 +240,7 @@ char *str_enumerate_n(char *old, int jump, size_t *len)
 			}
 #endif
 			int rem = (jump - 1) % search_space_size;
-			old = str_append(old, search_lookup_forward(rem));
+			old = str_append(old, oldlen, search_lookup_forward(rem));
 			oldlen += 1;
 		}
 		else
@@ -202,24 +258,11 @@ char *str_enumerate_n(char *old, int jump, size_t *len)
 	return old;
 }
 
-/** \brief String multi-replace.
- *
- * Performs a replace of certain singular characters into other strings.
- *
- * Faster than performing several replaces in sequence, but less versatile.
- *
- * Will free the source string on replace.
- *
- * @param src Input string.
- * @param replacements Replacement structs.
- * @param rnum Replacement table size.
- * @return Modified or the original string.
- */
-char* str_multireplace(char *src, const char_replace_t *replacements,
-		size_t rnum)
+char* str_multireplace(char *src, size_t *slen,
+		const char_replace_t *replacements,	size_t rnum)
 {
-	size_t orig_len = strlen(src),
-				 new_len = orig_len;
+	size_t orig_len = *slen,
+		 		 new_len = *slen;
 	int replace_needed = 0;
 
 	for(size_t ii = 0; (ii < orig_len); ++ii)
@@ -247,6 +290,7 @@ char* str_multireplace(char *src, const char_replace_t *replacements,
 
 	char *ret = (char*)malloc(sizeof(char) * (new_len + 1));
 	ret[new_len] = 0;
+	*slen = new_len;
 
 	size_t kk = 0;
 	for(size_t ii = 0; (ii < orig_len); ++ii)
@@ -324,7 +368,7 @@ char* str_replace(char *src, const char *needle, const char *replacement)
 		char cc = src[ii];
 
 #ifdef TRIPCRUNCH_DEBUG
-		printf("cc: %c kk ) %i\n", cc, kk);
+		printf("cc: %c kk ) %i\n", cc, (int)kk);
 #endif
 
 		ret[kk] = cc;
@@ -363,20 +407,11 @@ char* str_replace(char *src, const char *needle, const char *replacement)
 	return ret;
 }
 
-char* htmlspecialchars(char *src)
+char* htmlspecialchars(char *src, size_t *slen)
 {
-	static const char_replace_t htmlspecialchar_replaces[] =
-	{
-		{ '&', "&amp;", 5 },
-		{ '<', "&lt;", 4 },
-		{ '>', "&gt;", 4 },
-		{ '"', "&quot;", 6 }
-		//{ '\'', "&39;", 5 } // This replace is not used,
-	};
-	static const size_t htmlspecialchar_replace_count = 4;
-	return str_multireplace(src,
-			htmlspecialchar_replaces,
-			htmlspecialchar_replace_count);
+	return str_multireplace(src, slen,
+			htmlspecialchars_replaces,
+			htmlspecialchars_replace_count);
 }
 
 ////////////////////////////////////////

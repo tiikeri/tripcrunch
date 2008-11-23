@@ -85,7 +85,7 @@ AR_FLAGS="cru"
 LTCC="gcc -std=gnu99"
 
 # LTCC compiler flags.
-LTCFLAGS="-march=k8"
+LTCFLAGS=""
 
 # A language-specific compiler.
 CC="gcc -std=gnu99"
@@ -7361,7 +7361,7 @@ AR_FLAGS="cru"
 LTCC="gcc -std=gnu99"
 
 # LTCC compiler flags.
-LTCFLAGS="-march=k8"
+LTCFLAGS=""
 
 # A language-specific compiler.
 CC="g++"
@@ -7670,7 +7670,7 @@ AR_FLAGS="cru"
 LTCC="gcc -std=gnu99"
 
 # LTCC compiler flags.
-LTCFLAGS="-march=k8"
+LTCFLAGS=""
 
 # A language-specific compiler.
 CC="gfortran"

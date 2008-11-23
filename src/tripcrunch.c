@@ -1,21 +1,17 @@
 ////////////////////////////////////////
-// Information /////////////////////////
+// Define //////////////////////////////
 ////////////////////////////////////////
 
-/*
- * Copyright (c), Anonymous of Suomus, 2008.
- *
- * BSD Licence.
- */
+#define _MULTI_THREADED
 
 ////////////////////////////////////////
 // Include /////////////////////////////
 ////////////////////////////////////////
 
-#include "config.h"
+#include "tripcrunch.h"
+
 #include "hash_2chan.h"
 #include "str_utils.h"
-#include "tripcrunch.h"
 
 #include <ctype.h>
 #include <errno.h>
@@ -28,12 +24,7 @@
 #include <sys/time.h>
 #include <time.h>
 
-////////////////////////////////////////
-// Global //////////////////////////////
-////////////////////////////////////////
-
-/** Used to lock critical sections in hash calculations if necessary. */
-pthread_mutex_t hash_mutex;
+#include <pthread.h>
 
 ////////////////////////////////////////
 // Struct //////////////////////////////
@@ -98,12 +89,6 @@ static int64_t benchmark_start;
 /** Benchmark starting time. */
 static int64_t benchmark_end;
 
-/** Thread count. */
-static long int thread_count = 1;
-
-/** Current thread count. */
-static int threads_running = 0;
-
 /** Current tripcode. */
 static char *current_tripcode = NULL;
 
@@ -123,7 +108,7 @@ static size_t search_tripcode_count = 0;
 static char *progress_filename = NULL;
 
 /** Encrypt function to use. */
-char* (*encrypt_function)(char*, const char*) = NULL;
+char* (*encrypt_function)(char*, const char*, size_t) = NULL;
 
 /** Lowerifier function. */
 char (*char_transform)(char) = NULL;
@@ -275,10 +260,7 @@ static char* get_next_string(char *dst, size_t *len)
 	}
 	pthread_mutex_lock(&term_mutex);
 
-	// TODO: replace str_enumerate_n with a simpler enumeration that only moves
-	// one character forward.
-	current_tripcode =
-		str_enumerate_n(current_tripcode, 1, &current_tripcode_len);
+	current_tripcode = str_enumerate_1(current_tripcode, &current_tripcode_len);
 	if((*len) != current_tripcode_len)
 	{
 		*len = current_tripcode_len;
@@ -393,17 +375,18 @@ static char char_transform_nocase_leet(char src)
 /** \brief Test a tripcode against all searched codes.
  *
  * @param trip Tripcode searched.
+ * @param triplen Length of the tripcode to examine.
  * @param code Space for testing.
  * @param stream Stream to print the match in.
  * @return Number of matches found or zero.
  */
-static int test_trip(char *trip, char *code, FILE *stream);
-static int test_trip(char *trip, char *code, FILE *stream)
+static int test_trip(char *trip, size_t triplen, char *code, FILE *stream);
+static int test_trip(char *trip, size_t triplen, char *code, FILE *stream)
 {
 	int ret = 0;
 
 	// Perform the encryption.
-	encrypt_function(code, trip);
+	encrypt_function(code, trip, triplen);
 	
 	// Look for matches.
 	size_t len = strlen(code);
@@ -442,10 +425,6 @@ static int test_trip(char *trip, char *code, FILE *stream)
 static void* threadfunc_tripcrunch(void*);
 static void* threadfunc_tripcrunch(void *args_not_in_use)
 {
-	pthread_mutex_lock(&term_mutex);
-	++threads_running;
-	pthread_mutex_unlock(&term_mutex);
-
 	// Reserve the required space for encryption.
 	char *enc = (char*)malloc(sizeof(char) * hash_space_required);
 
@@ -462,18 +441,13 @@ static void* threadfunc_tripcrunch(void *args_not_in_use)
 		}
 		trip = newtrip;
 
-		test_trip(trip, enc, stdout);
+		test_trip(trip, triplen, enc, stdout);
 		//puts(trip);
 	}
 
 	// Codes not required anymore.
 	free(enc);
 	free(trip);
-
-	pthread_mutex_lock(&term_mutex);
-	--threads_running;
-	pthread_cond_signal(&term_cond);
-	pthread_mutex_unlock(&term_mutex);
 	return 0;
 }
 
@@ -536,6 +510,7 @@ int main(int argc, char **argv)
 	int enable_generate = 0,
 			enable_leet = 0,
 			enable_case = 0;
+	long int thread_count = 1;
 
 	while(1)
 	{
@@ -607,8 +582,8 @@ int main(int argc, char **argv)
 					exit_cleanup();
 					return 1;
 				}
-				current_tripcode = strdup(optarg);
-				current_tripcode_len = strlen(current_tripcode);
+				current_tripcode_len = strlen(optarg);
+				current_tripcode = memdup(optarg, current_tripcode_len + 1);
 				printf("Using starting code: %s\n", current_tripcode);
 				break;
 
@@ -638,7 +613,7 @@ int main(int argc, char **argv)
 							sizeof(tripcode_t) * (++search_tripcode_count));
 			}
 			tripcode_t *trip = search_tripcodes + (search_tripcode_count - 1);
-			trip->trip = strdup(opt);
+			trip->trip = (char*)memdup(opt, len + 1);
 			trip->len = len;
 		}
 		else
@@ -705,10 +680,9 @@ int main(int argc, char **argv)
 
 		for(size_t ii = 0; (ii < search_tripcode_count); ++ii)
 		{
-			char *trip = search_tripcodes[ii].trip;
-
-			encrypt_function(enc, trip);
-			printf("Password %s encrypts to tripcode %s\n", trip, enc);
+			tripcode_t *trip = search_tripcodes + ii;
+			encrypt_function(enc, trip->trip, trip->len);
+			printf("Password %s encrypts to tripcode %s\n", trip->trip, enc);
 		}
 
 		free(enc);
@@ -764,14 +738,13 @@ int main(int argc, char **argv)
 	if(current_tripcode)
 	{
 		char *enc = (char*)malloc(sizeof(char) * hash_space_required);
-		test_trip(current_tripcode, enc, stdout);
+		test_trip(current_tripcode, current_tripcode_len, enc, stdout);
 		free(enc);
 	}
 
 	signal(SIGINT, tripcrunch_signal_handler);
 	signal(SIGTERM, tripcrunch_signal_handler);
 	pthread_cond_init(&term_cond, NULL);
-	pthread_mutex_init(&hash_mutex, NULL);
 	pthread_mutex_init(&term_mutex, NULL);
 
 	pthread_mutex_lock(&term_mutex);
@@ -781,10 +754,7 @@ int main(int argc, char **argv)
 	for(int ii = 0; (ii < thread_count); ++ii)
 	{
 		int err =
-			pthread_create(threads + ii,
-					NULL,
-					threadfunc_tripcrunch,
-					NULL);
+			pthread_create(threads + ii, NULL, threadfunc_tripcrunch, NULL);
 		if(err)
 		{
 			fprintf(stderr, "ERROR %s\n", strerror(err));
@@ -797,13 +767,7 @@ int main(int argc, char **argv)
 	benchmark_end = get_current_time_int64();
 
 	flag_tripcrunch_terminate = 1;
-	while(threads_running > 0)
-	{
-		pthread_cond_wait(&term_cond, &term_mutex);
-	}
-	
 	pthread_mutex_unlock(&term_mutex);
-
 	for(int ii = 0; (ii < thread_count); ++ii)
 	{
 		pthread_join(threads[ii], NULL);
@@ -811,7 +775,6 @@ int main(int argc, char **argv)
 	free(threads);
 
 	pthread_cond_destroy(&term_cond);
-	pthread_mutex_destroy(&hash_mutex);
 	pthread_mutex_destroy(&term_mutex);
 
 	// Must save progress beforew other cleanup.

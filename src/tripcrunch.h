@@ -1,12 +1,16 @@
 #ifndef TRIPCRUNCH_H_INCLUDE
 #define TRIPCRUNCH_H_INCLUDE
 
-// Required for pthread.
+/** \file Tripcrunch main header.
+ *
+ * This file must be included first to all tripcrunch files to declare
+ * essential definitions.
+ */
+
 #define _MULTI_THREADED
 
-#include <pthread.h>
+#include "config.h"
 
-/** Used to lock critical sections in hash calculations if necessary. */
-extern pthread_mutex_t hash_mutex;
+#include <pthread.h>
 
 #endif
