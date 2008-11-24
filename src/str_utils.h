@@ -32,9 +32,6 @@ extern void* memdup(const void *src, size_t len);
 
 /** \brief Compare two strings as per their enumeration order.
  *
- * Note that due to the operation order of the enumeration functions, this
- * actually happens from the end to the beginning.
- *
  * Longer string is always enumerationally greater.
  *
  * @param lhs Left-hand size operand.

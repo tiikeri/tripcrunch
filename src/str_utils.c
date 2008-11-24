@@ -96,7 +96,7 @@ static inline int search_lookup_backward(char cc)
 
 /** \brief Append to string.
  *
- * Generates a new string with the given character at the end.
+ * Generates a new string with the given character at the beginning.
  *
  * Deletes previous string.
  *
@@ -104,15 +104,16 @@ static inline int search_lookup_backward(char cc)
  *
  * @param old Old string.
  * @param oldlen Old string length.
- * @param chr ASCII number of character to append.
+ * @param chr Character to append.
  * @return New string.
  */
-static char* str_append(char *old, size_t oldlen, int chr);
-static char* str_append(char *old, size_t oldlen, int chr)
+static char* str_prepend(char *old, size_t oldlen, char chr);
+static char* str_prepend(char *old, size_t oldlen, char chr)
 {
-	char *ret = (char*)realloc(old,  sizeof(char) * (oldlen + 2));
-	ret[oldlen]  = (char)chr;
-	ret[oldlen + 1] = 0;
+	char *ret = (char*)malloc(sizeof(char) * (oldlen + 2));
+	memcpy(ret + 1, old, oldlen + 1);
+	free(old);
+	ret[0] = chr;
 	return ret;
 }
 
@@ -144,12 +145,9 @@ int str_enumcmp(const char *lhs, size_t lhslen, const char *rhs,
 		return -1;
 	}
 
-	char *li = (char*)lhs + lhslen,
-			 *ri = (char*)rhs + rhslen;
+	char *li = (char*)lhs,
+			 *ri = (char*)rhs;
 	do {
-		--li;
-		--ri;
-
 		int cl = search_lookup_backward(*li),
 				cr = search_lookup_backward(*ri);
 		if(cl < cr)
@@ -160,6 +158,9 @@ int str_enumcmp(const char *lhs, size_t lhslen, const char *rhs,
 		{
 			return 1;
 		}
+
+		++li;
+		++ri;
 	} while(--lhslen);
 
 	return 0;
@@ -222,98 +223,105 @@ char* str_enumerate_1(char *old, size_t *len)
 		return ret;
 	}
 
-	int oldlen = (int)(*len);
+	size_t oldlen = *len;
+	char *iter = old + oldlen - 1;
 
-	for(int ii = 0;; ++ii)
+	while(1)
 	{
-		char cc = old[ii];
-		int idx = search_lookup_backward(cc);
+		int idx = search_lookup_backward(*iter) + 1;
 
-		if(idx + 1 < search_space_size)
+		if(idx < search_space_size)
 		{
-			old[ii] = search_lookup_forward(idx + 1);
+			*iter = search_lookup_forward(idx);
 			return old;
 		}
-		old[ii] = search_lookup_forward(0);
+		*iter = search_lookup_forward(0);
 
-		if(ii + 1 >= oldlen)
+		if(iter == old)
 		{
-			*len = (size_t)(oldlen + 1);
-			return str_append(old, (size_t)oldlen, search_lookup_forward(0));
+			*len = oldlen + 1;
+			return str_prepend(old, oldlen, search_lookup_forward(0));
 		}
+		--iter;
 	}
 }
 
 char *str_enumerate_fn(char *old, int jump, size_t *len)
 {
-	int oldlen = (int)(*len);
+	size_t oldlen = *len;
+	char *iter = old + oldlen - 1;
 
-	for(int ii = 0; ; ++ii)
+	while(1)
 	{
-		int cc = search_lookup_backward(old[ii]);
-
-		cc += jump;
-		if(cc < search_space_size)
+		int idx = search_lookup_backward(*iter) + jump;
+		
+		if(idx < search_space_size)
 		{
-			old[ii] = search_lookup_forward(cc);
+			*iter = search_lookup_forward(idx);
 			return old;
 		}
-		old[ii] = search_lookup_forward(cc - search_space_size);
+		*iter = search_lookup_forward(idx - search_space_size);
 		jump = 1;
 
-		if(ii + 1 >= oldlen)
+		if(iter == old)
 		{
-			*len = (size_t)(oldlen + 1);
-			return str_append(old, (size_t)oldlen, search_lookup_forward(0));
+			*len = oldlen + 1;
+			return str_prepend(old, oldlen, search_lookup_forward(0));
 		}
+		--iter;
 	}
 }
 
 
 char* str_enumerate_n(char *old, int jump, size_t *len)
 {
+	size_t oldlen = *len;
+
 	// Special case, first jump.
 	if(!old)
 	{
-		int rem = jump % search_space_size;
 		old = (char*)malloc(sizeof(char) * 2);
-		old[0] = search_lookup_forward(rem);
+		old[0] = search_lookup_forward(jump % search_space_size);
 		old[1] = 0;
-		*len = 1;
-		jump -= rem;
+		oldlen = 1;
+		for(jump /= search_space_size;
+				(jump);
+				jump /= search_space_size)
+		{
+			char cc = search_lookup_forward(jump % search_space_size);
+			old =	str_prepend(old, oldlen, cc);
+			++oldlen;
+		}
+		*len = oldlen;
+		return old;
 	}
 
-	size_t oldlen = *len;
+	char *iter = old + oldlen - 1;
 
-	// Advance forward in the search space.
-	size_t idx = 0;
-	while(jump)
-	{
-		if(idx >= oldlen)
+	do {
+		jump += search_lookup_backward(*iter);
+		int rem = jump % search_space_size;
+
+		*iter = search_lookup_forward(rem);
+		jump /= search_space_size;
+
+		if(iter == old)
 		{
-#ifdef TRIPCRUNCH_DEBUG
-			if(jump <= 0)
+			for(;
+					(jump);
+					jump /= search_space_size)
 			{
-				printf("ERROR, jump should always be > 0 when appending\n");
-				exit(1);
+				char cc = search_lookup_forward(jump % search_space_size);
+				old =	str_prepend(old, oldlen, cc);
+				++oldlen;
 			}
-#endif
-			int rem = (jump - 1) % search_space_size;
-			old = str_append(old, oldlen, search_lookup_forward(rem));
-			oldlen += 1;
+			*len = oldlen;
+			return old;
 		}
-		else
-		{
-			jump = jump + search_lookup_backward(old[idx]);
-			int rem = jump % search_space_size;
-			old[idx] = search_lookup_forward(rem);
-		}
-		jump = jump / search_space_size;
-		++idx;
-	}
+		--iter;
+	} while(jump);
 
-	// Might be changed, might be not.
-	*len = oldlen;
+	// No need to update len since it isn't changed.
 	return old;
 }
 
