@@ -120,11 +120,49 @@ static char* str_append(char *old, size_t oldlen, int chr)
 // Extern //////////////////////////////
 ////////////////////////////////////////
 
+int get_search_space_size(void)
+{
+	return search_space_size;
+}
+
 void* memdup(const void *src, size_t len)
 {
 	void *ret = malloc(len);
 	memcpy(ret, src, len);
 	return ret;
+}
+
+int str_enumcmp(const char *lhs, size_t lhslen, const char *rhs,
+		size_t rhslen)
+{
+	if(lhslen > rhslen)
+	{
+		return 1;
+	}
+	else if(lhslen < rhslen)
+	{
+		return -1;
+	}
+
+	char *li = (char*)lhs + lhslen,
+			 *ri = (char*)rhs + rhslen;
+	do {
+		--li;
+		--ri;
+
+		int cl = search_lookup_backward(*li),
+				cr = search_lookup_backward(*ri);
+		if(cl < cr)
+		{
+			return -1;
+		}
+		else if(cl > cr)
+		{
+			return 1;
+		}
+	} while(--lhslen);
+
+	return 0;
 }
 
 int str_enumerate_init(const char *sspace)
@@ -184,32 +222,53 @@ char* str_enumerate_1(char *old, size_t *len)
 		return ret;
 	}
 
-	size_t oldlen = *len,
-				 ii = 0;
+	int oldlen = (int)(*len);
 
-	for(;;)
+	for(int ii = 0;; ++ii)
 	{
 		char cc = old[ii];
 		int idx = search_lookup_backward(cc);
 
-		if(idx + 1 >= search_space_size)
-		{
-			old[ii] = search_lookup_forward(0);
-		}
-		else
+		if(idx + 1 < search_space_size)
 		{
 			old[ii] = search_lookup_forward(idx + 1);
 			return old;
 		}
+		old[ii] = search_lookup_forward(0);
 
 		if(ii + 1 >= oldlen)
 		{
-			*len = oldlen + 1;
-			return str_append(old, oldlen, search_lookup_forward(0));
+			*len = (size_t)(oldlen + 1);
+			return str_append(old, (size_t)oldlen, search_lookup_forward(0));
 		}
-		++ii;
 	}
 }
+
+char *str_enumerate_fn(char *old, int jump, size_t *len)
+{
+	int oldlen = (int)(*len);
+
+	for(int ii = 0; ; ++ii)
+	{
+		int cc = search_lookup_backward(old[ii]);
+
+		cc += jump;
+		if(cc < search_space_size)
+		{
+			old[ii] = search_lookup_forward(cc);
+			return old;
+		}
+		old[ii] = search_lookup_forward(cc - search_space_size);
+		jump = 1;
+
+		if(ii + 1 >= oldlen)
+		{
+			*len = (size_t)(oldlen + 1);
+			return str_append(old, (size_t)oldlen, search_lookup_forward(0));
+		}
+	}
+}
+
 
 char* str_enumerate_n(char *old, int jump, size_t *len)
 {

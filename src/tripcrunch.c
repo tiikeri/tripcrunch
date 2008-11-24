@@ -41,6 +41,17 @@ typedef struct tripcode_struct
 	size_t len;
 } tripcode_t;
 
+/** \brief Structure for current thread execution position.
+ */
+typedef struct thread_info_struct
+{
+	/** Current tripcode. */
+	tripcode_t trip;
+
+	/** Calculations done. */
+	int64_t count;
+} thread_info_t;
+
 ////////////////////////////////////////
 // Local variable //////////////////////
 ////////////////////////////////////////
@@ -80,15 +91,6 @@ static int flag_print_benchmarks = 0;
 /** Used for termination. */
 static int flag_tripcrunch_terminate = 0;
 
-/** Number of tripcodes processed. */
-static int64_t benchmark_processed = 0;
-
-/** Benchmark starting time. */
-static int64_t benchmark_start;
-
-/** Benchmark starting time. */
-static int64_t benchmark_end;
-
 /** Current tripcode. */
 static char *current_tripcode = NULL;
 
@@ -106,6 +108,9 @@ static size_t search_tripcode_count = 0;
 
 /** Progress filename. */
 static char *progress_filename = NULL;
+
+/** Number of threads in use. */
+static long int thread_count = 1;
 
 /** Encrypt function to use. */
 char* (*encrypt_function)(char*, const char*, size_t) = NULL;
@@ -128,19 +133,21 @@ static void tripcrunch_signal_handler(int signum)
 	{
 		case SIGTERM:
 			puts("Terminated.");
-			pthread_cond_signal(&term_cond);
 			break;
 
 		case SIGINT:
 			puts("Interrupt.");
-			pthread_cond_signal(&term_cond);
 			break;
 
 		default:
 			puts("Unknown signal.");
-			pthread_cond_signal(&term_cond);
 			break;
 	}
+
+	// All signals that have not explicitly returned, terminate the execution.
+	pthread_mutex_lock(&term_mutex);
+	pthread_cond_signal(&term_cond);
+	pthread_mutex_unlock(&term_mutex);
 }
 
 /** \brief Read current progress into a trip from a file.
@@ -235,45 +242,6 @@ static void progress_save(const char *filename, char *trip)
 
 	fprintf(pfile, "%s", current_tripcode);
 	fclose(pfile);
-}
-
-/** \brief Get a new string in a critical section.
- *
- * This function is used to get a new string, generated from the current one.
- *
- * If dst is too small for the current tripcode, it will be freed and
- * replaced. Note thet dst MUST be reserved when calling this, even if it's
- * length specified in len is 0.
- *
- * If this function returns NULL, the caller should stop searching.
- *
- * @param dst Write the current tripcode here.
- * @param len Length of dst in chars not counting terminating zero.
- * @return NULL if quitting, otherwise the new tripcode.
- */
-static char* get_next_string(char *dst, size_t *len);
-static char* get_next_string(char *dst, size_t *len)
-{
-	if(flag_tripcrunch_terminate)
-	{
-		return NULL;
-	}
-	pthread_mutex_lock(&term_mutex);
-
-	current_tripcode = str_enumerate_1(current_tripcode, &current_tripcode_len);
-	if((*len) != current_tripcode_len)
-	{
-		*len = current_tripcode_len;
-		free(dst);
-		dst = (char*)malloc(sizeof(char) * (current_tripcode_len + 1));
-	}
-	memcpy(dst, current_tripcode, sizeof(char) * (current_tripcode_len + 1));
-
-	// The calculation for benchmarks must be in the critical section.
-	++benchmark_processed;
-
-	pthread_mutex_unlock(&term_mutex);
-	return dst;
 }
 
 /** \brief Transform character (case sensitive, no leet).
@@ -418,37 +386,42 @@ static int test_trip(char *trip, size_t triplen, char *code, FILE *stream)
 
 /** \brief Trip cruncher thread function.
  *
- * No arguments currently.
+ * The arguments passed are a pointer to a thread info struct.
  *
- * @param args_not_in_use Not used.
+ * @param args Thread information.
  */
-static void* threadfunc_tripcrunch(void*);
-static void* threadfunc_tripcrunch(void *args_not_in_use)
+static void* threadfunc_tripcrunch(void *args);
+static void* threadfunc_tripcrunch(void *args)
 {
+	// Read the current index and calculate initial string according to them.
+	thread_info_t *tinfo = (thread_info_t*)args;
+	char *trip = tinfo->trip.trip;
+	size_t triplen = tinfo->trip.len;
+	int jump = (int)thread_count;
+	int64_t count = 0;
+
 	// Reserve the required space for encryption.
 	char *enc = (char*)malloc(sizeof(char) * hash_space_required);
 
-	// Faster to skip one check in inner loop.
-	char *trip = (char*)malloc(sizeof(char) * 1);
-	size_t triplen = 0;
+	// The threads may not begin execution before they're all created.
+	pthread_mutex_lock(&term_mutex);
+	pthread_mutex_unlock(&term_mutex);
 
-	while(1)
+	for(; (!flag_tripcrunch_terminate); ++count)
 	{
-		char *newtrip = get_next_string(trip, &triplen);
-		if(!newtrip)
-		{
-			break;
-		}
-		trip = newtrip;
-
 		test_trip(trip, triplen, enc, stdout);
+		trip = str_enumerate_fn(trip, jump, &triplen);
 		//puts(trip);
 	}
 
-	// Codes not required anymore.
+	// Encryption space not required anymore.
 	free(enc);
-	free(trip);
-	return 0;
+
+	// Return thread information.
+	tinfo->trip.trip = trip;
+	tinfo->trip.len = triplen;
+	tinfo->count = count;
+	return tinfo;
 }
 
 /** \brief Free all reserved global memory.
@@ -510,8 +483,6 @@ int main(int argc, char **argv)
 	int enable_generate = 0,
 			enable_leet = 0,
 			enable_case = 0;
-	long int thread_count = 1;
-
 	while(1)
 	{
 		int indexptr = 0;
@@ -650,6 +621,17 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
+	// Thread cap based on search space size.
+	{
+		long int sspacesize = get_search_space_size();
+		if(sspacesize < thread_count)
+		{
+			printf("WARNING: current search space limits to %i threads\n",
+					(int)sspacesize);
+			thread_count = sspacesize;
+		}
+	}
+
 	// Decide character transform.
 	printf("Using character transform: ");
 	if(enable_case && enable_leet)
@@ -742,40 +724,67 @@ int main(int argc, char **argv)
 		free(enc);
 	}
 
-	signal(SIGINT, tripcrunch_signal_handler);
-	signal(SIGTERM, tripcrunch_signal_handler);
 	pthread_cond_init(&term_cond, NULL);
 	pthread_mutex_init(&term_mutex, NULL);
+	signal(SIGINT, tripcrunch_signal_handler);
+	signal(SIGTERM, tripcrunch_signal_handler);
 
+	// Enter critical section and create all threads.
 	pthread_mutex_lock(&term_mutex);
-
 	pthread_t *threads =
 		(pthread_t*)malloc(sizeof(pthread_t) * (unsigned)thread_count);
 	for(int ii = 0; (ii < thread_count); ++ii)
 	{
+		// Reserve the thread info for passing to the threads.
+		thread_info_t *tinfo = (thread_info_t*)malloc(sizeof(thread_info_t));
+
+		// Give the next tripcode to the string.
+		current_tripcode =
+			str_enumerate_1(current_tripcode, &current_tripcode_len);
+		tinfo->trip.trip = memdup(current_tripcode, current_tripcode_len + 1);
+		tinfo->trip.len = current_tripcode_len;
 		int err =
-			pthread_create(threads + ii, NULL, threadfunc_tripcrunch, NULL);
+			pthread_create(threads + ii, NULL, threadfunc_tripcrunch, tinfo);
 		if(err)
 		{
 			fprintf(stderr, "ERROR %s\n", strerror(err));
-			return 1;
+			return 1; // Should never happen, okay to not clean up.
 		}
 	}
 
-	benchmark_start = get_current_time_int64();
+	// Wait for exit, then leave critical section.
+	int64_t benchmark_start = get_current_time_int64();
 	pthread_cond_wait(&term_cond, &term_mutex);
-	benchmark_end = get_current_time_int64();
-
+	int64_t benchmark_end = get_current_time_int64();
 	flag_tripcrunch_terminate = 1;
 	pthread_mutex_unlock(&term_mutex);
+
+	// Process the return information from the threads.
+	int64_t benchmark_processed = 0;
 	for(int ii = 0; (ii < thread_count); ++ii)
 	{
-		pthread_join(threads[ii], NULL);
+		thread_info_t *tinfo;
+		pthread_join(threads[ii], (void**)(&tinfo));
+
+		char *trip = tinfo->trip.trip;
+		size_t len = tinfo->trip.len;
+		int64_t count = tinfo->count;
+		printf("Thread %i: %s (%.0f trips)\n", ii, tinfo->trip.trip,
+				(double)(tinfo->count));
+		benchmark_processed += count;
+
+		int cmp = str_enumcmp(current_tripcode, current_tripcode_len, trip, len);
+		if((cmp > 0) || ((ii <= 0) && count))
+		{
+			free(current_tripcode);
+			current_tripcode = memdup(trip, len + 1);
+			current_tripcode_len = len;
+		}
+
+		free(trip);
+		free(tinfo);
 	}
 	free(threads);
-
-	pthread_cond_destroy(&term_cond);
-	pthread_mutex_destroy(&term_mutex);
 
 	// Must save progress beforew other cleanup.
 	if(progress_filename)
@@ -802,6 +811,8 @@ int main(int argc, char **argv)
 				trips / secs);
 	}
 
+	pthread_cond_destroy(&term_cond);
+	pthread_mutex_destroy(&term_mutex);
 	return 0;
 }
 
