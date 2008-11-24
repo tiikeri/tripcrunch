@@ -2,9 +2,6 @@
 // Define //////////////////////////////
 ////////////////////////////////////////
 
-/** Replacement string length for futallaby salt replace. */
-#define FUTA_REPLACE_LEN 14
-
 /** If defined, use multireplace instead of normal replace. */
 #define USE_STR_MULTIREPLACE
 
@@ -29,16 +26,6 @@
 /** Search space for strings. */
 const char *search_space_2chan =
 "!\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[]^_`abcdefghijklmnopqrstuvwxyz{|}";
-
-////////////////////////////////////////
-// Local ///////////////////////////////
-////////////////////////////////////////
-
-/** Futallaby salt replace from. */
-static char *futa_fr = ":;<=>?@[\\]^_`";
-
-/** Futallaby salt replace to. */
-static char *futa_to = "ABCDEFGabcdef";
 
 ////////////////////////////////////////
 // Extern //////////////////////////////
@@ -74,26 +61,25 @@ char* hash_2chan(char *dst, const char *src, size_t srclen)
 		salt[0] = str[1];
 		salt[1] = str[2];
 	}
-	// Replace everything not between . and z with .
+	// Perform replaces.
 	for(int ii = 0; (ii < 2); ++ii)
 	{
-		int cc = salt[ii];
+		int cc = (int)(salt[ii]);
 
+		// Not '.' <-> 'z' => '.'
 		if((cc < '.') || (cc > 'z'))
 		{
 			salt[ii] = '.';
 		}
-	}
-	// Perform the larger replacement.
-	for(int ii = 0; (ii < 2); ++ii)
-	{
-		for(int jj = 0; (jj < FUTA_REPLACE_LEN); ++jj)
+		// :;<=>?@ => ABCDEFG
+		else if((cc >= ':') && (cc <= '@'))
 		{
-			if(salt[ii] == futa_fr[jj])
-			{
-				salt[ii] = futa_to[jj];
-				break;
-			}
+			salt[ii] = (char)(cc + ('A' - ':'));
+		}
+		// [\]^_` => abcdef
+		else if((cc >= '[') && (cc <= '`'))
+		{
+			salt[ii] = (char)(cc + ('a' - '['));
 		}
 	}
 
