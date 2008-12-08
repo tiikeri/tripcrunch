@@ -36,7 +36,6 @@ AC_CHECK_LIB([ssl],
 						 [],
 						 [openssl=no],
 						 [-lcrypto])
-iconv=[yes]
 
 AC_CONFIG_HEADERS([src/config.h])
 AC_CONFIG_FILES([Makefile src/Makefile])
@@ -48,9 +47,6 @@ if test x$pthread == xno ; then
 fi
 if test x$openssl == xno ; then
 	AC_MSG_ERROR([openssl DES_fcrypt() not found])
-fi
-if test x$iconv == xno ; then
-	AC_MSG_ERROR([iconv not found])
 fi
 AC_MSG_RESULT([yes])
 

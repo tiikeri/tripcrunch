@@ -8,8 +8,6 @@
 // Include /////////////////////////////
 ////////////////////////////////////////
 
-#include "tripcrunch.h"
-
 #include "hash_2chan.h"
 #include "str_utils.h"
 
@@ -97,9 +95,6 @@ static char *current_tripcode = NULL;
 /** Current tripcode length. */
 static size_t current_tripcode_len = 0;
 
-/** Space required for hash space, dependant on the password method. */
-static size_t hash_space_required;
-
 /** Table of tripcodes. */
 static tripcode_t *search_tripcodes = NULL;
 
@@ -112,8 +107,8 @@ static char *progress_filename = NULL;
 /** Number of threads in use. */
 static long int thread_count = 1;
 
-/** Encrypt function to use. */
-char* (*encrypt_function)(char*, const char*, size_t) = NULL;
+/** Encryption info used. */
+encrypt_info_t einfo = { NULL, NULL, 0, NULL, NULL };
 
 /** Lowerifier function. */
 char (*char_transform)(char) = NULL;
@@ -145,9 +140,7 @@ static void tripcrunch_signal_handler(int signum)
 	}
 
 	// All signals that have not explicitly returned, terminate the execution.
-	pthread_mutex_lock(&term_mutex);
-	pthread_cond_signal(&term_cond);
-	pthread_mutex_unlock(&term_mutex);
+	flag_tripcrunch_terminate = 1;
 }
 
 /** \brief Read current progress into a trip from a file.
@@ -340,50 +333,6 @@ static char char_transform_nocase_leet(char src)
 	}
 }
 
-/** \brief Test a tripcode against all searched codes.
- *
- * @param trip Tripcode searched.
- * @param triplen Length of the tripcode to examine.
- * @param code Space for testing.
- * @param stream Stream to print the match in.
- * @return Number of matches found or zero.
- */
-static int test_trip(char *trip, size_t triplen, char *code, FILE *stream);
-static int test_trip(char *trip, size_t triplen, char *code, FILE *stream)
-{
-	int ret = 0;
-
-	// Perform the encryption.
-	encrypt_function(code, trip, triplen);
-	
-	// Look for matches.
-	size_t len = strlen(code);
-	for(size_t kk = 0; (kk < search_tripcode_count); ++kk)
-	{
-		char *desired_tripcode = search_tripcodes[kk].trip;
-		size_t desired_tripcode_len = search_tripcodes[kk].len;
-		size_t jj = 0;
-		for(size_t ii = 0; (ii < len); ++ii)
-		{
-			if(char_transform(code[ii]) == desired_tripcode[jj])
-			{
-				++jj;
-				if(jj >= desired_tripcode_len)
-				{
-					fprintf(stream, "Match: %s encrypts to trip %s\n", trip, code);
-					break;
-				}
-			}
-			else
-			{
-				jj = 0;
-			}
-		}
-	}
-
-	return ret;
-}
-
 /** \brief Trip cruncher thread function.
  *
  * The arguments passed are a pointer to a thread info struct.
@@ -400,22 +349,16 @@ static void* threadfunc_tripcrunch(void *args)
 	int jump = (int)thread_count;
 	int64_t count = 0;
 
-	// Reserve the required space for encryption.
-	char *enc = (char*)malloc(sizeof(char) * hash_space_required);
-
 	// The threads may not begin execution before they're all created.
 	pthread_mutex_lock(&term_mutex);
 	pthread_mutex_unlock(&term_mutex);
 
-	for(; (!flag_tripcrunch_terminate); ++count)
+	while(!flag_tripcrunch_terminate)
 	{
-		test_trip(trip, triplen, enc, stdout);
+		count += einfo.test_function(trip, triplen, stdout);
 		trip = str_enumerate_fn(trip, jump, &triplen);
 		//puts(trip);
 	}
-
-	// Encryption space not required anymore.
-	free(enc);
 
 	// Return thread information.
 	tinfo->trip.trip = trip;
@@ -449,6 +392,42 @@ static void exit_cleanup(void)
 	}
 
 	str_enumerate_free();
+}
+
+////////////////////////////////////////
+// Global //////////////////////////////
+////////////////////////////////////////
+
+int tripcrunch_test(const char *trip, const char *code, size_t len,
+		FILE *stream)
+{
+	int ret = 0;
+
+	// Look for matches.
+	for(size_t kk = 0; (kk < search_tripcode_count); ++kk)
+	{
+		char *desired_tripcode = search_tripcodes[kk].trip;
+		size_t desired_tripcode_len = search_tripcodes[kk].len;
+		size_t jj = 0;
+		for(size_t ii = 0; (ii < len); ++ii)
+		{
+			if(char_transform(code[ii]) == desired_tripcode[jj])
+			{
+				++jj;
+				if(jj >= desired_tripcode_len)
+				{
+					fprintf(stream, "Match: %s encrypts to trip %s\n", trip, code);
+					break;
+				}
+			}
+			else
+			{
+				jj = 0;
+			}
+		}
+	}
+
+	return ret;
 }
 
 ////////////////////////////////////////
@@ -496,13 +475,13 @@ int main(int argc, char **argv)
 		switch(opt)
 		{
 			case '2':
-				if(encrypt_function)
+				if(einfo.name)
 				{
 					fputs("Tripcode algorithm may only be specified once.", stderr);
 					exit_cleanup();
 					return 1;
 				}
-				encrypt_function = hash_2chan;
+				einfo = encrypt_info_2chan;
 				break;
 
 			case 'b':
@@ -602,24 +581,12 @@ int main(int argc, char **argv)
 	}
 
 	// If no algo selected yet, pick 2chan.
-	if(!encrypt_function)
+	if(!einfo.name)
 	{
-		encrypt_function = hash_2chan;
+		einfo = encrypt_info_2chan;
 	}
-
-	// Print used algo.
-	printf("Using algorithm: ");
-	if(encrypt_function == hash_2chan)
-	{
-		puts("2chan / 4chan");
-		str_enumerate_init(search_space_2chan);
-		hash_space_required = 11;
-	}
-	else
-	{
-		puts("unknown algorithm, aborting");
-		return 1;
-	}
+	printf("Using algorithm: %s\n", einfo.name);
+	str_enumerate_init(einfo.search_space);
 
 	// Thread cap based on search space size.
 	{
@@ -633,41 +600,44 @@ int main(int argc, char **argv)
 	}
 
 	// Decide character transform.
-	printf("Using character transform: ");
-	if(enable_case && enable_leet)
+	if(!enable_generate)
 	{
-		char_transform = char_transform_leet;
-		puts("1337");
-	}
-	else if(enable_case)
-	{
-		char_transform = char_transform_identity;
-		puts("none");
-	}
-	else if(enable_leet)
-	{
-		char_transform = char_transform_nocase_leet;
-		puts("case insensitive, 1337");
-	}
-	else
-	{
-		char_transform = char_transform_nocase;
-		puts("case insensitive");
+		printf("Using character transform: ");
+		if(enable_case && enable_leet)
+		{
+			char_transform = char_transform_leet;
+			puts("1337");
+		}
+		else if(enable_case)
+		{
+			char_transform = char_transform_identity;
+			puts("none");
+		}
+		else if(enable_leet)
+		{
+			char_transform = char_transform_nocase_leet;
+			puts("case insensitive, 1337");
+		}
+		else
+		{
+			char_transform = char_transform_nocase;
+			puts("case insensitive");
+		}
 	}
 
 	// If generate trip requested, do it and exit.
 	if(enable_generate)
 	{
-		char *enc = (char*)malloc(sizeof(char) * hash_space_required);
-
 		for(size_t ii = 0; (ii < search_tripcode_count); ++ii)
 		{
 			tripcode_t *trip = search_tripcodes + ii;
-			encrypt_function(enc, trip->trip, trip->len);
-			printf("Password %s encrypts to tripcode %s\n", trip->trip, enc);
+			char *enc = einfo.encrypt_function(trip->trip, trip->len);
+			printf("Password %s encrypts to tripcode %s\n",
+					trip->trip,
+					enc);
+			free(enc);
 		}
 
-		free(enc);
 		exit_cleanup();
 		return 0;
 	}
@@ -676,13 +646,13 @@ int main(int argc, char **argv)
 	for(size_t ii = 0; (ii < search_tripcode_count); ++ii)
 	{
 		tripcode_t *trip = search_tripcodes + ii;
-		if(trip->len >= hash_space_required)
+		if(trip->len >= einfo.max_code_length)
 		{
 			fprintf(stderr,
 					"Code %s is %u chars long, too much for current algo (%u).\n",
 					trip->trip,
 					(unsigned)(trip->len),
-					(unsigned)(hash_space_required - 1));
+					(unsigned)(einfo.max_code_length - 1));
 			exit_cleanup();
 			return 1;
 		}
@@ -717,11 +687,11 @@ int main(int argc, char **argv)
 	}
 
 	// Try the initial tripcode if it has been specified.
+	int64_t benchmark_processed = 0;
 	if(current_tripcode)
 	{
-		char *enc = (char*)malloc(sizeof(char) * hash_space_required);
-		test_trip(current_tripcode, current_tripcode_len, enc, stdout);
-		free(enc);
+		benchmark_processed +=
+			einfo.test_function(current_tripcode, current_tripcode_len, stdout);
 	}
 
 	pthread_cond_init(&term_cond, NULL);
@@ -754,13 +724,9 @@ int main(int argc, char **argv)
 
 	// Wait for exit, then leave critical section.
 	int64_t benchmark_start = get_current_time_int64();
-	pthread_cond_wait(&term_cond, &term_mutex);
-	int64_t benchmark_end = get_current_time_int64();
-	flag_tripcrunch_terminate = 1;
 	pthread_mutex_unlock(&term_mutex);
 
-	// Process the return information from the threads.
-	int64_t benchmark_processed = 0;
+	// Immediately start joining the threads.
 	for(int ii = 0; (ii < thread_count); ++ii)
 	{
 		thread_info_t *tinfo;
@@ -784,9 +750,13 @@ int main(int argc, char **argv)
 		free(trip);
 		free(tinfo);
 	}
+
+	// All threads have been joined, time to end the benchmark and free the
+	// thread table.
+	int64_t benchmark_end = get_current_time_int64();
 	free(threads);
 
-	// Must save progress beforew other cleanup.
+	// Must save progress before other cleanup.
 	if(progress_filename)
 	{
 		progress_save(progress_filename, current_tripcode);

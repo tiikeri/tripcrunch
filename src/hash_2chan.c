@@ -2,9 +2,6 @@
 // Include /////////////////////////////
 ////////////////////////////////////////
 
-#include "tripcrunch.h"
-
-#include "crypt_des.h"
 #include "hash_2chan.h"
 #include "str_utils.h"
 
@@ -14,47 +11,47 @@
 #include "openssl/des.h"
 
 ////////////////////////////////////////
-// Global //////////////////////////////
+// Local ///////////////////////////////
 ////////////////////////////////////////
 
-/** Search space for strings. */
-const char *search_space_2chan =
-"!\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[]^_`abcdefghijklmnopqrstuvwxyz{|}";
-
-////////////////////////////////////////
-// Extern //////////////////////////////
-////////////////////////////////////////
-
-char* hash_2chan(char *dst, const char *src, size_t srclen)
+/** \brief Generate salt and fix the source string.
+ *
+ * Note that the source length must NOT be zero.
+ *
+ * @param salt Destination space for salt.
+ * @param buf Destination space for string.
+ * @param src Source string.
+ * @param slen Length slot of source string.
+ * @return New string length.
+ */
+static size_t generate_salt(char *salt, char *buf, const char *src,
+		size_t slen);
+static size_t generate_salt(char *salt, char *buf, const char *src,
+		size_t slen)
 {
-	char salt[3] = { 'H', '.', 0 };
-
-	if(src == NULL)
-	{
-		return NULL;
-	}
-
 	// Need a duplicate for htmlspecialchars.
-	size_t slen = srclen;
-	char *str = htmlspecialchars((char*)memdup(src, srclen + 1), &slen);
-
-	if(slen <= 0)
-	{
-		free(str);
-		return NULL;
-	}
+	size_t ret = htmlspecialchars_fast(buf, src, slen);
 
 	// Construct base salt.
-	if(slen == 2)
+	switch(ret)
 	{
-		salt[0] = str[1];
-		salt[1] = 'H';
+		case 1:
+			salt[0] = 'H';
+			salt[1] = '.';
+			break;
+
+		case 2:
+			salt[0] = buf[1];
+			salt[1] = 'H';
+			break;
+
+		default:
+			salt[0] = buf[1];
+			salt[1] = buf[2];
+			break;
 	}
-	else if(slen > 2)
-	{
-		salt[0] = str[1];
-		salt[1] = str[2];
-	}
+	salt[2] = 0;
+
 	// Perform replaces.
 	for(int ii = 0; (ii < 2); ++ii)
 	{
@@ -77,13 +74,63 @@ char* hash_2chan(char *dst, const char *src, size_t srclen)
 		}
 	}
 
-	// Crypt the source and return a clone of essential data.
-	char enc[14]; // DES result size is always 13 characters.
-	DES_fcrypt(str, salt, enc);
-	memcpy(dst, enc + 3, 11); 
-	free(str);
-	return dst;
+	// Return the previously reserved string.
+	return ret;
 }
+
+/** \brief Implementation of encrypt function.
+ *
+ * @param src Source chars.
+ * @param srclen Length of source in chars.
+ * @return Newly allocated encrypted string.
+ */
+static char* encrypt_2chan(const char *src, size_t srclen);
+static char* encrypt_2chan(const char *src, size_t srclen)
+{
+	char salt[3], enc[14],
+			 *str = create_safe_cstr_buffer(srclen);
+
+	generate_salt(salt, str, src, srclen);
+
+	DES_fcrypt(str, salt, enc);
+	free(str);
+	return memdup(enc + 3, 11);
+}
+
+/** \brief Implementation of the test function.
+ *
+ * @param src Source chars.
+ * @param srclen Length of source in chars.
+ * @param print File to print into.
+ * @return Number of tests done.
+ */
+static int test_2chan(const char *src, size_t srclen, FILE *print);
+static int test_2chan(const char *src, size_t srclen, FILE *print)
+{
+	char salt[3], enc[14],
+			 *str = create_safe_cstr_buffer(srclen);
+
+	generate_salt(salt, str, src, srclen);
+
+	DES_fcrypt(str, salt, enc);
+	tripcrunch_test(src, enc + 3, 10, print);
+	free(str);
+	return 1;
+}
+
+////////////////////////////////////////
+// Global //////////////////////////////
+////////////////////////////////////////
+
+/** Search space for strings. */
+const encrypt_info_t encrypt_info_2chan =
+{
+	"2chan / 4chan",
+	"!\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[]^_`abcdefghijklmnopqrstuvwxyz{|}",
+	10,
+	encrypt_2chan,
+	test_2chan
+};
 
 ////////////////////////////////////////
 // Extern //////////////////////////////

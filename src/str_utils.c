@@ -9,8 +9,6 @@
 // Include /////////////////////////////
 ////////////////////////////////////////
 
-#include "tripcrunch.h"
-
 #include "str_utils.h"
 
 #include <stdlib.h>
@@ -120,6 +118,11 @@ static char* str_prepend(char *old, size_t oldlen, char chr)
 ////////////////////////////////////////
 // Extern //////////////////////////////
 ////////////////////////////////////////
+
+char* create_safe_cstr_buffer(size_t len)
+{
+	return (char*)malloc(sizeof(char) * ((len + 2) * 5));
+}
 
 int get_search_space_size(void)
 {
@@ -388,6 +391,41 @@ char* str_multireplace(char *src, size_t *slen,
 	return ret;
 }
 
+size_t str_multireplace_fast(char *dst, const char *src, size_t slen,
+		const char_replace_t *replacements,	size_t rnum)
+{
+	size_t ret = slen,
+				 kk = 0;
+
+	for(size_t ii = 0; (ii < slen); ++ii)
+	{
+		char cc = src[ii];
+
+		int replace_done = 0;
+		for(size_t jj = 0; (jj < rnum); ++jj)
+		{
+			const char_replace_t *rep = replacements + jj;
+
+			if(rep->src == cc)
+			{
+				size_t dstlen = rep->dstlen;
+				memcpy(dst + kk, rep->dst, dstlen);
+				ret += dstlen - 1;
+				kk += dstlen;
+				replace_done = 1;
+				break;
+			}
+		}
+		if(!replace_done)
+		{
+			dst[kk++] = cc;
+		}
+	}
+
+	dst[ret] = 0;
+	return ret;
+}
+
 char* str_replace(char *src, const char *needle, const char *replacement)
 {
 #ifdef TRIPCRUNCH_DEBUG
@@ -477,6 +515,13 @@ char* str_replace(char *src, const char *needle, const char *replacement)
 char* htmlspecialchars(char *src, size_t *slen)
 {
 	return str_multireplace(src, slen,
+			htmlspecialchars_replaces,
+			htmlspecialchars_replace_count);
+}
+
+size_t htmlspecialchars_fast(char *dst, const char *src, size_t slen)
+{
+	return str_multireplace_fast(dst, src, slen,
 			htmlspecialchars_replaces,
 			htmlspecialchars_replace_count);
 }

@@ -1,7 +1,7 @@
 #ifndef STR_UTILS_H_INCLUDE
 #define STR_UTILS_H_INCLUDE
 
-#include <stdio.h>
+#include "tripcrunch.h"
 
 /** \brief Struct for char replacements.
  */
@@ -16,6 +16,19 @@ typedef struct char_replace_struct
 	/** Size of replace string. */
 	size_t dstlen;
 } char_replace_t;
+
+/** \brief Creates a string buffer with a safe size.
+ *
+ * In practice, takes into account the worst possible space any string
+ * manipulations within this program might require, given the input buffer
+ * size.
+ *
+ * This might be rather large.
+ *
+ * @param len Length of unexploded string.
+ * @return Newly allocated safe buffer.
+ */
+extern char* create_safe_cstr_buffer(size_t len);
 
 /** \brief Get the size of the current search space.
  *
@@ -117,6 +130,24 @@ extern char *str_enumerate_1(char *old, size_t *len);
 extern char* str_multireplace(char *src, size_t *slen,
 		const char_replace_t *replacements, size_t rnum);
 
+/** \brief Fast string multi-replace.
+ *
+ * Works like str_multireplace(char*, size_t*, const char_replace_t*, size_t),
+ * but requires a destination character buffer to write the result into.
+ *
+ * The destination buffer must be large enough to accomodate the worst-case
+ * replacement.
+ *
+ * @param dst Destination buffer.
+ * @param src Input string.
+ * @param slen Input string length.
+ * @param replacements Replacement structs.
+ * @param rnum Replacement table size.
+ * @return Length of destination string.
+ */
+extern size_t str_multireplace_fast(char *dst, const char *src, size_t slen,
+		const char_replace_t *replacements, size_t rnum);
+
 /** \brief Perform a string replace.
  *
  * Will search the string for instances of a certain string, will return the
@@ -143,5 +174,20 @@ extern char* str_replace(char *src, const char *needle,
  * @return String with htmlspecialchars done on it.
  */
 extern char* htmlspecialchars(char *src, size_t *slen);
+
+/** \brief Perform a fast htmlspecialchars replace on a source string.
+ *
+ * Works like htmlspecialchars(char*, size_t*), but requires a destination
+ * character buffer to write the result into.
+ *
+ * The destination buffer must be large enough to accomodate the worst-case
+ * replacement.
+ *
+ * @param dst Destination buffer.
+ * @param src Source string.
+ * @param slen Input string length.
+ * @return Length of destination string.
+ */
+extern size_t htmlspecialchars_fast(char *dst, const char *src, size_t slen);
 
 #endif
