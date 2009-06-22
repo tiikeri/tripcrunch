@@ -2,10 +2,10 @@ dnl If $2 is 'yes', define and make an am_conditional of $1
 dnl AC_CONDITIONAL_DEFINE([DEFINE_STRING], [TEST_STRING])
 AC_DEFUN([AC_CONDITIONAL_DEFINE],
 [
-  if test x$2 == xyes ; then
+  if test x$2 = xyes ; then
     AC_DEFINE_UNQUOTED([$1], [], [Conditionally defined])
   fi
-  AM_CONDITIONAL([$1], [test x$2 == xyes])
+  AM_CONDITIONAL([$1], [test x$2 = xyes])
   AC_SUBST([$1], [$2])
 ])
 
@@ -102,7 +102,7 @@ AC_DEFUN([AC_CHECK_CCFLAG],
 			[],
 			flag=[yes],
 			flag=[no])
-		if test x$flag == xno ; then
+		if test x$flag = xno ; then
 			CFLAGS="$CFLAGS_save"
 		fi
 		AC_MSG_RESULT([$flag])
@@ -123,7 +123,7 @@ AC_DEFUN([AC_CHECK_CXXFLAG],
 			[],
 			flag=[yes],
 			flag=[no])
-		if test x$flag == xno ; then
+		if test x$flag = xno ; then
 			CXXFLAGS="$CXXFLAGS_save"
 		fi
 		AC_MSG_RESULT([$flag])
@@ -132,7 +132,7 @@ AC_DEFUN([AC_CHECK_CXXFLAG],
 ])
 
 dnl Check if given C++ compiler flag produces runnable code.
-dnl AC_CHECK_CCFLAG([FLAG])
+dnl AC_CHECK_CCRUN([FLAG])
 AC_DEFUN([AC_CHECK_CCRUN],
 [
 	AC_LANG_PUSH([C])
@@ -143,7 +143,7 @@ AC_DEFUN([AC_CHECK_CCRUN],
 		flag=[yes],
 		flag=[no],
 		flag=[no])
-	if test x$flag == xno ; then
+	if test x$flag = xno ; then
 		CFLAGS="$CFLAGS_save"
 	fi
 	AC_MSG_RESULT([$flag])
@@ -151,7 +151,7 @@ AC_DEFUN([AC_CHECK_CCRUN],
 ])
 
 dnl Check if given C++ compiler flag produces runnable code.
-dnl AC_CHECK_CCFLAG([FLAG])
+dnl AC_CHECK_CXXRUN([FLAG])
 AC_DEFUN([AC_CHECK_CXXRUN],
 [
 	AC_LANG_PUSH([C++])
@@ -162,7 +162,7 @@ AC_DEFUN([AC_CHECK_CXXRUN],
 		flag=[yes],
 		flag=[no],
 		flag=[no])
-	if test x$flag == xno ; then
+	if test x$flag = xno ; then
 		CXXFLAGS="$CXXFLAGS_save"
 	fi
 	AC_MSG_RESULT([$flag])
@@ -197,7 +197,7 @@ AC_DEFUN([AC_CHECK_LDFLAG],
 		[],
 		flag=[yes],
 		flag=[no])
-	if test x$flag == xno ; then
+	if test x$flag = xno ; then
 		LDFLAGS=[$LDFLAGS_save]
 	fi
 	AC_MSG_RESULT([$flag])
@@ -252,7 +252,7 @@ AC_DEFUN([AC_COMPILE_MODE],
     optimizations=[no],
     optimizations=[yes])
 
-	if test x$debug == xyes ; then
+	if test x$debug = xyes ; then
 		optimizations=[no]
 	fi
 
@@ -273,7 +273,7 @@ AC_DEFUN([AC_COMPILE_MODE],
 		AC_CHECK_CFLAG([-O2])
 	fi
 	AC_CHECK_CFLAG([-pipe])
-	if test x$debug == xno ; then
+	if test x$debug = xno ; then
 		AC_CHECK_CFLAG([-fomit-frame-pointer])
 		AC_CHECK_LDFLAG([-s])
 	fi
@@ -295,7 +295,7 @@ AC_DEFUN([AC_COMPILE_MODE],
 		AC_CHECK_CCFLAG([-Wstrict-prototypes])
 		AC_CHECK_CFLAG([-Wswitch-default])
 	fi
-	if test x$debug$optimizations == xnoyes ; then
+	if test x$debug$optimizations = xnoyes ; then
 		AC_CHECK_CFLAG([-ftracer])
 		AC_CHECK_CFLAG([-fweb])
 	fi
@@ -324,7 +324,7 @@ AC_DEFUN([AC_ENABLE_TESTS],
 		tests=[no])
 	AC_CONDITIONAL_DEFINE([$1], [$tests])
 	AC_MSG_RESULT([$tests])
-	if test x$tests == xyes ; then
+	if test x$tests = xyes ; then
 		ifelse([$2], , :, [$2])
 	else
 		ifelse([$3], , :, [$3])
@@ -348,7 +348,7 @@ AC_DEFUN([AC_CHECK_POINTER_SIZE],
 	AC_RUN_IFELSE(
 		[int main(void)
 		{
-			if(sizeof(void*) == 4)
+			if(sizeof(void*) = 4)
 			{
 				return 0;
 			}
@@ -357,7 +357,7 @@ AC_DEFUN([AC_CHECK_POINTER_SIZE],
 		[acptrsize32bit=yes],
 		[acptrsize32bit=no],
 		[acptrsize32bit=no])
-	if test x$acptrsize32bit == xyes ; then
+	if test x$acptrsize32bit = xyes ; then
 		AC_MSG_RESULT([yes])
 	else
 		AC_MSG_RESULT([no])
@@ -367,7 +367,7 @@ AC_DEFUN([AC_CHECK_POINTER_SIZE],
 	AC_RUN_IFELSE(
 		[int main(void)
 		{
-			if(sizeof(void*) == 8)
+			if(sizeof(void*) = 8)
 			{
 				return 0;
 			}
@@ -376,7 +376,7 @@ AC_DEFUN([AC_CHECK_POINTER_SIZE],
 		[acptrsize64bit=yes],
 		[acptrsize64bit=no],
 		[acptrsize64bit=no])
-	if test x$acptrsize64bit == xyes ; then
+	if test x$acptrsize64bit = xyes ; then
 		AC_MSG_RESULT([yes])
 	else
 		AC_MSG_RESULT([no])
@@ -389,12 +389,12 @@ dnl AC_INCORPORATE([name], [yesno], [cflags], [libs], [define], [obligatory])
 AC_DEFUN([AC_INCORPORATE],
 [
 	AC_MSG_CHECKING([if $1 is ok])
-	if test x$2 == xyes ; then
+	if test x$2 = xyes ; then
 		AC_ADD_CCFLAG([$3])
 		AC_ADD_CXXFLAG([$3])
 		AC_ADD_LIB([$4])
 		AC_MSG_RESULT([yes])
-	elif test x$6 == xyes ; then
+	elif test x$6 = xyes ; then
 		AC_MSG_ERROR([no])
 	else
 		AC_MSG_RESULT([no])
@@ -417,7 +417,7 @@ AC_DEFUN([AC_INCORPORATE_PKGCONFIG],
 ])
 
 dnl Incorporate Freetype2.
-dnl AC_INCORPORATE_FREETYPE2([version], [define on found], [obligatory])a
+dnl AC_INCORPORATE_FREETYPE2([version], [define on found], [obligatory])
 AC_DEFUN([AC_INCORPORATE_FREETYPE2],
 [
 	AC_CHECK_FT2([$1],
@@ -427,13 +427,19 @@ AC_DEFUN([AC_INCORPORATE_FREETYPE2],
 ])
 
 dnl Incorporate libpng.
-dnl AC_INCORPORATE_LIBPNG([version], [define on found], [obligatory])a
+dnl AC_INCORPORATE_LIBPNG([version], [define on found], [obligatory])
 AC_DEFUN([AC_INCORPORATE_LIBPNG],
 [
 	AC_INCORPORATE_PKGCONFIG([libpng],
 		[$1],
 		[$2],
-		[$3])
+		[no])
+	if test x$pkgc = xno ; then
+		AC_INCORPORATE_PKGCONFIG([libpng12],
+			[$1],
+			[$2],
+			[$3])
+	fi
 ])
 
 dnl Incorporate SDL.
@@ -461,18 +467,18 @@ AC_DEFUN([AC_INCORPORATE_OPENGL],
 		glu=[yes],
 		glu=[no])
 	AC_MSG_CHECKING([if OpenGL is ok])
-	if test x$gl == xyes ; then
-		if test x$glu == xyes ; then
+	if test x$gl = xyes ; then
+		if test x$glu = xyes ; then
 			AC_MSG_RESULT([yes])
 			AC_CONDITIONAL_DEFINE([$1], [yes])
-		elif test x$2 == xyes ; then
+		elif test x$2 = xyes ; then
 			AC_MSG_ERROR([no])
 			AC_CONDITIONAL_DEFINE([$1], [no])
 		else
 			AC_MSG_RESULT([no])
 			AC_CONDITIONAL_DEFINE([$1], [no])
 		fi
-	elif test x$2 == xyes ; then
+	elif test x$2 = xyes ; then
 		AC_MSG_ERROR([no])
 		AC_CONDITIONAL_DEFINE([$1], [no])
 	else
@@ -504,10 +510,77 @@ AC_DEFUN([AC_REQUEST_C99],
 		AC_MSG_RESULT([yes])
 		AC_CONDITIONAL_DEFINE([$1], [$ac_cv_prog_cc_c99])
 	else
-		if test x$obligatory == xyes ; then
+		if test x$obligatory = xyes ; then
 			AC_MSG_ERROR([no])
 		else
 			AC_MSG_RESULT([no])
 		fi
 	fi
+])
+
+dnl Check if openmp is supported.
+dnl AC_CHECK_OPENMP([define on yes], [obligatory])
+AC_DEFUN([AC_INCORPORATE_OPENMP],
+[
+	openmp_c=[yes]
+	openmp_cxx=[yes]
+	openmp_ld=[yes]
+
+	if test "x$CC" != x ; then
+		AC_LANG_PUSH([C])
+		AC_MSG_CHECKING([if $CC accepts -fopenmp])
+		CFLAGS_save=[$CFLAGS]
+		AC_ADD_CCFLAG([-fopenmp])
+		AC_TRY_COMPILE([],
+			[],
+			flag=[yes],
+			flag=[no])
+		if test x$flag = xno ; then
+			openmp_c=[no]
+		fi
+		AC_MSG_RESULT([$flag])
+		AC_LANG_POP([C])
+		CFLAGS="$CFLAGS_save"
+	fi
+
+	if test "x$CXX" != x ; then
+		AC_LANG_PUSH([C++])
+		AC_MSG_CHECKING([if $CXX accepts -fopenmp])
+		CXXFLAGS_save=[$CXXFLAGS]
+		AC_ADD_CXXFLAG([-fopenmp])
+		AC_TRY_COMPILE([],
+			[],
+			flag=[yes],
+			flag=[no])
+		if test x$flag = xno ; then
+			openmp_cxx=[no]
+		fi
+		AC_MSG_RESULT([$flag])
+		AC_LANG_POP([C++])
+		CXXFLAGS="$CXXFLAGS_save"
+	fi
+
+	AC_MSG_CHECKING([if $LD accepts -fopenmp])
+	LDFLAGS_save=[$LDFLAGS]
+	AC_ADD_LDFLAG([-fopenmp])
+	AC_TRY_LINK([],
+		[],
+		flag=[yes],
+		flag=[no])
+	if test x$flag = xno ; then
+		openmp_ld=[no]
+	fi
+	AC_MSG_RESULT([$flag])
+	LDFLAGS=[$LDFLAGS_save]
+
+	openmp_ok=[no]
+	if test x$openmp_c = xyes ; then
+		if test x$openmp_cxx = xyes ; then
+			if test x$openmp_ld = xyes ; then
+				openmp_ok=[yes]
+			fi
+		fi
+	fi
+
+	AC_INCORPORATE([OpenMP], [$openmp_ok], [-fopenmp], [-fopenmp], [$1], [$2])
 ])
