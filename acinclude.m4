@@ -190,7 +190,7 @@ dnl Check if given linker flag is approperiate and include if yes.
 dnl AC_CHECK_LDFLAG([FLAG])
 AC_DEFUN([AC_CHECK_LDFLAG],
 [
-	AC_MSG_CHECKING([if $LD accepts $1])
+	AC_MSG_CHECKING([if linker accepts $1])
 	LDFLAGS_save=[$LDFLAGS]
 	AC_ADD_LDFLAG([$1])
 	AC_TRY_LINK([],

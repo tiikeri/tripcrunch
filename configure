@@ -6613,8 +6613,8 @@ ac_compiler_gnu=$ac_cv_c_compiler_gnu
 
 
 
-	{ echo "$as_me:$LINENO: checking if $LD accepts -s" >&5
-echo $ECHO_N "checking if $LD accepts -s... $ECHO_C" >&6; }
+	{ echo "$as_me:$LINENO: checking if linker accepts -s" >&5
+echo $ECHO_N "checking if linker accepts -s... $ECHO_C" >&6; }
 	LDFLAGS_save=$LDFLAGS
 
 	LDFLAGS_addsave=$LDFLAGS
