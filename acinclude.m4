@@ -2,10 +2,10 @@ dnl If $2 is 'yes', define and make an am_conditional of $1
 dnl AC_CONDITIONAL_DEFINE([DEFINE_STRING], [TEST_STRING])
 AC_DEFUN([AC_CONDITIONAL_DEFINE],
 [
-  if test x$2 = xyes ; then
-    AC_DEFINE_UNQUOTED([$1], [], [Conditionally defined])
+  if test "x$2" = "xyes" ; then
+    AC_DEFINE_UNQUOTED([$1], [1], [Conditionally defined])
   fi
-  AM_CONDITIONAL([$1], [test x$2 = xyes])
+  AM_CONDITIONAL([$1], [test "x$2" = "xyes"])
   AC_SUBST([$1], [$2])
 ])
 
@@ -267,6 +267,10 @@ AC_DEFUN([AC_COMPILE_MODE],
   	AC_MSG_RESULT([optimized])
 		AC_CHECK_CFLAG([-O3])
 		AC_CHECK_CFLAG([-ffast-math])
+		AC_CHECK_CFLAG([-fgcse-sm])
+		AC_CHECK_CFLAG([-fgcse-las])
+		AC_CHECK_CFLAG([-fgcse-after-reload])
+		AC_CHECK_CFLAG([-fsee])
 		AC_CHECK_CFLAG([-fsingle-precision-constant])
 	else
   	AC_MSG_RESULT([normal])
@@ -467,18 +471,18 @@ AC_DEFUN([AC_INCORPORATE_OPENGL],
 		glu=[yes],
 		glu=[no])
 	AC_MSG_CHECKING([if OpenGL is ok])
-	if test x$gl = xyes ; then
-		if test x$glu = xyes ; then
+	if test "x$gl" = "xyes" ; then
+		if test "x$glu" = "xyes" ; then
 			AC_MSG_RESULT([yes])
 			AC_CONDITIONAL_DEFINE([$1], [yes])
-		elif test x$2 = xyes ; then
+		elif test "x$2" = "xyes" ; then
 			AC_MSG_ERROR([no])
 			AC_CONDITIONAL_DEFINE([$1], [no])
 		else
 			AC_MSG_RESULT([no])
 			AC_CONDITIONAL_DEFINE([$1], [no])
 		fi
-	elif test x$2 = xyes ; then
+	elif test "x$2" = "xyes" ; then
 		AC_MSG_ERROR([no])
 		AC_CONDITIONAL_DEFINE([$1], [no])
 	else
@@ -506,9 +510,9 @@ AC_DEFUN([AC_REQUEST_C99],
 [
 	AC_PROG_CC_C99()
 	AC_MSG_CHECKING([for C99])
-	if test x$ac_cv_prog_cc_c99 != xno ; then
+	if test "x$ac_cv_prog_cc_c99" != "xno" ; then
 		AC_MSG_RESULT([yes])
-		AC_CONDITIONAL_DEFINE([$1], [$ac_cv_prog_cc_c99])
+		AC_CONDITIONAL_DEFINE([$1], [yes])
 	else
 		if test x$obligatory = xyes ; then
 			AC_MSG_ERROR([no])
