@@ -68,7 +68,7 @@ static const char usage[] =
 "  -l, --enable-leet                    Enable leetspeak in comparisons.\n"
 "                                       (default: no)\n"
 "  -g, --generate                       Generate tripcodes instead of search.\n"
-"  -w, --wildcard                       Allow wildcard ? in tests. Disables\n"
+"  -w, --enable-wildcard                Allow wildcard ? in tests. Disables\n"
 "                                       searching for an actual ? character.\n\n"
 "Command line options with arguments:\n"
 "  -n <num>, --nthreads=<num>           Number of threads to use.\n"
