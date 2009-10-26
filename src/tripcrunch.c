@@ -11,7 +11,6 @@
 #include "hash_2chan.h"
 #include "str_utils.h"
 
-#include <ctype.h>
 #include <errno.h>
 #include <getopt.h>
 #include <inttypes.h>
@@ -68,7 +67,9 @@ static const char usage[] =
 "  -h, --help                           Print this help.\n"
 "  -l, --enable-leet                    Enable leetspeak in comparisons.\n"
 "                                       (default: no)\n"
-"  -g, --generate                       Generate tripcodes instead of search.\n\n"
+"  -g, --generate                       Generate tripcodes instead of search.\n"
+"  -w, --wildcard                       Allow wildcard ? in tests. Disables\n"
+"                                       searching for an actual ? character.\n\n"
 "Command line options with arguments:\n"
 "  -n <num>, --nthreads=<num>           Number of threads to use.\n"
 "                                       (default: 1)\n"
@@ -108,10 +109,13 @@ static char *progress_filename = NULL;
 static long int thread_count = 1;
 
 /** Encryption info used. */
-encrypt_info_t einfo = { NULL, NULL, 0, NULL, NULL };
+static encrypt_info_t einfo = { NULL, NULL, 0, NULL, NULL };
 
-/** Lowerifier function. */
-char (*char_transform)(char) = NULL;
+/** Character transform function. */
+static char (*char_transform_func)(char) = NULL;
+
+/** String search function. */
+static int (*strstr_func)(const char*, size_t, const char*, size_t);
 
 ////////////////////////////////////////
 // Local function //////////////////////
@@ -237,102 +241,6 @@ static void progress_save(const char *filename, char *trip)
 	fclose(pfile);
 }
 
-/** \brief Transform character (case sensitive, no leet).
- *
- * @param src Source character.
- * @return Transformed character.
- */
-static char char_transform_identity(char src);
-static char char_transform_identity(char src)
-{
-	return src;
-}
-
-/** \brief Transform character (case insensitive, no leet).
- *
- * @param src Source character.
- * @return Transformed character.
- */
-static char char_transform_nocase(char src);
-static char char_transform_nocase(char src)
-{
-	return (char)tolower(src);
-}
-
-/** \brief Transform character (leet).
- *
- * @param src Source character.
- * @return Transformed character.
- */
-static char char_transform_leet(char src);
-static char char_transform_leet(char src)
-{
-	switch(src)
-	{
-		case '1':
-			return 'I';
-
-		case '2':
-			return 'Z';
-
-		case '3':
-			return 'E';
-
-		case '4':
-			return 'A';
-
-		case '5':
-			return 'S';
-
-		case '7':
-			return 'T';
-
-		case '0':
-			return 'O';
-
-		default:
-			return src;
-	}
-}
-
-/** \brief Transform character (case insensitive, leet).
- *
- * @param src Source character.
- * @return Transformed character.
- */
-static char char_transform_nocase_leet(char src);
-static char char_transform_nocase_leet(char src)
-{
-	src = (char)tolower(src);
-
-	switch(src)
-	{
-		case '1':
-			return 'i';
-
-		case '2':
-			return 'z';
-
-		case '3':
-			return 'e';
-
-		case '4':
-			return 'a';
-
-		case '5':
-			return 's';
-
-		case '7':
-			return 't';
-
-		case '0':
-			return 'o';
-
-		default:
-			return src;
-	}
-}
-
 /** \brief Trip cruncher thread function.
  *
  * The arguments passed are a pointer to a thread info struct.
@@ -395,39 +303,34 @@ static void exit_cleanup(void)
 }
 
 ////////////////////////////////////////
-// Global //////////////////////////////
+// Global function /////////////////////
 ////////////////////////////////////////
 
-int tripcrunch_test(const char *trip, const char *code, size_t len,
-		FILE *stream)
+int trip_compare(const char *trip, const char *result, const char *compare,
+		size_t len, FILE *stream)
 {
-	int ret = 0;
-
-	// Look for matches.
-	for(size_t kk = 0; (kk < search_tripcode_count); ++kk)
+	for(size_t jj = 0; (jj < search_tripcode_count); ++jj)
 	{
-		char *desired_tripcode = search_tripcodes[kk].trip;
-		size_t desired_tripcode_len = search_tripcodes[kk].len;
-		size_t jj = 0;
-		for(size_t ii = 0; (ii < len); ++ii)
+		tripcode_t *trip_struct = search_tripcodes + jj;
+		if(strstr_func(trip_struct->trip, trip_struct->len, compare, len) >= 0)
 		{
-			if(char_transform(code[ii]) == desired_tripcode[jj])
-			{
-				++jj;
-				if(jj >= desired_tripcode_len)
-				{
-					fprintf(stream, "Match: %s encrypts to trip %s\n", trip, code);
-					break;
-				}
-			}
-			else
-			{
-				jj = 0;
-			}
+			fprintf(stream, "Match: %s encrypts to trip %s\n", trip, result);
+			return 1;
 		}
 	}
 
-	return ret;
+	return 0;
+}
+
+void trip_transform(char *dst, const char *src, size_t len)
+{
+	char *srciter = (char*)src;
+	do {
+		*dst = char_transform_func(*srciter);
+		++dst;
+		++srciter;
+	} while(--len);
+	*dst = 0;
 }
 
 ////////////////////////////////////////
@@ -454,14 +357,16 @@ int main(int argc, char **argv)
 		{	"nthreads", required_argument, NULL, 'n' },
 		{	"progress-file", required_argument, NULL, 'p' },
 		{	"start-from", required_argument, NULL, 's' },
+		{	"wildcard", no_argument, NULL, 'w' },
 		{ NULL, 0, 0, 0 }
 	};
-	static const char *opts_short = "2cbhlgn:p:s:";
+	static const char *opts_short = "2cbhlgn:p:s:w";
 
 	// Local args.
 	int enable_generate = 0,
 			enable_leet = 0,
-			enable_case = 0;
+			enable_case = 0,
+			enable_wildcard = 0;
 	while(1)
 	{
 		int indexptr = 0;
@@ -537,6 +442,10 @@ int main(int argc, char **argv)
 				printf("Using starting code: %s\n", current_tripcode);
 				break;
 
+			case 'w':
+				enable_wildcard = 1;
+				break;
+
 			default:
 				puts(usage);
 				exit_cleanup();
@@ -602,26 +511,44 @@ int main(int argc, char **argv)
 	// Decide character transform.
 	if(!enable_generate)
 	{
+		char_transform_func = char_transform_identity;
+		strstr_func = strstr_normal;
 		printf("Using character transform: ");
-		if(enable_case && enable_leet)
+		if(enable_case && !enable_leet && !enable_wildcard)
 		{
-			char_transform = char_transform_leet;
-			puts("1337");
-		}
-		else if(enable_case)
-		{
-			char_transform = char_transform_identity;
 			puts("none");
-		}
-		else if(enable_leet)
-		{
-			char_transform = char_transform_nocase_leet;
-			puts("case insensitive, 1337");
 		}
 		else
 		{
-			char_transform = char_transform_nocase;
-			puts("case insensitive");
+			unsigned flag_line = 0;
+			if(enable_case)
+			{
+				if(enable_leet)
+				{
+					flag_line = fprint_list_spacing(stdout, flag_line);
+					printf("1337");
+					char_transform_func = char_transform_leet;
+				}
+			}
+			else
+			{
+				flag_line = fprint_list_spacing(stdout, flag_line);
+				printf("case_insensitive");
+				char_transform_func = char_transform_nocase;
+				if(enable_leet)
+				{
+					flag_line = fprint_list_spacing(stdout, flag_line);
+					printf("1337");
+					char_transform_func = char_transform_nocase_leet;
+				}
+			}
+			if(enable_wildcard)
+			{
+				flag_line = fprint_list_spacing(stdout, flag_line);
+				printf("wildcard");
+				strstr_func = strstr_wildcard;
+			}
+			puts("");
 		}
 	}
 
@@ -646,7 +573,7 @@ int main(int argc, char **argv)
 	for(size_t ii = 0; (ii < search_tripcode_count); ++ii)
 	{
 		tripcode_t *trip = search_tripcodes + ii;
-		if(trip->len >= einfo.max_code_length)
+		if(trip->len > einfo.max_code_length)
 		{
 			fprintf(stderr,
 					"Code %s is %u chars long, too much for current algo (%u).\n",
@@ -660,7 +587,7 @@ int main(int argc, char **argv)
 		// Perform case transform in precalc!
 		for(size_t jj = 0; (jj < trip->len); ++jj)
 		{
-			trip->trip[jj] = char_transform(trip->trip[jj]);
+			trip->trip[jj] = char_transform_func(trip->trip[jj]);
 		}
 	}
 

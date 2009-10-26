@@ -11,6 +11,7 @@
 
 #include "str_utils.h"
 
+#include <ctype.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -115,18 +116,164 @@ static char* str_prepend(char *old, size_t oldlen, char chr)
 	return ret;
 }
 
+/** \brief Check that lhs is found in rhs start.
+ *
+ * The length of lhs may not be 0.
+ *
+ * @param lhs Left-hand-side operand.
+ * @param lhslen Length of left-hand side operand.
+ * @param rhs Right-hand-side operand.
+ * @return Nonzero if equals, zero if differ.
+ */
+static int strstr_start_normal(const char *lhs, size_t lhslen, const char *rhs);
+static int strstr_start_normal(const char *lhs, size_t lhslen, const char *rhs)
+{
+	char *liter = (char*)lhs,
+			 *riter = (char*)rhs;
+	do {
+		if(*liter != *riter)
+		{
+			return 0;
+		}
+		++liter;
+		++riter;
+	} while(--lhslen);
+	return 1;
+}
+
+/** \brief Check that lhs is found in rhs start.
+ *
+ * As with strstr_start_normal, but lhs may contain wildcards.
+ *
+ * @param lhs Left-hand-side operand.
+ * @param lhslen Length of left-hand side operand.
+ * @param rhs Right-hand-side operand.
+ * @return Nonzero if equals, zero if differ.
+ */
+static int strstr_start_wildcard(const char *lhs, size_t lhslen, const char *rhs);
+static int strstr_start_wildcard(const char *lhs, size_t lhslen, const char *rhs)
+{
+	char *liter = (char*)lhs,
+			 *riter = (char*)rhs;
+	do {
+		char cc = *liter;
+		if((cc != WILDCARD_CHAR) && (cc != *riter))
+		{
+			return 0;
+		}
+		++liter;
+		++riter;
+	} while(--lhslen);
+	return 1;
+}
+
 ////////////////////////////////////////
 // Extern //////////////////////////////
 ////////////////////////////////////////
+
+char char_transform_identity(char src)
+{
+	return src;
+}
+
+char char_transform_nocase(char src)
+{
+	return (char)tolower(src);
+}
+
+char char_transform_leet(char src)
+{
+	switch(src)
+	{
+		case '1':
+			return 'I';
+
+		case '2':
+			return 'Z';
+
+		case '3':
+			return 'E';
+
+		case '4':
+			return 'A';
+
+		case '5':
+			return 'S';
+
+		case '7':
+			return 'T';
+
+		case '0':
+			return 'O';
+
+		default:
+			return src;
+	}
+}
+
+char char_transform_nocase_leet(char src)
+{
+	src = (char)tolower(src);
+
+	switch(src)
+	{
+		case '1':
+			return 'i';
+
+		case '2':
+			return 'z';
+
+		case '3':
+			return 'e';
+
+		case '4':
+			return 'a';
+
+		case '5':
+			return 's';
+
+		case '7':
+			return 't';
+
+		case '0':
+			return 'o';
+
+		default:
+			return src;
+	}
+}
 
 char* create_safe_cstr_buffer(size_t len)
 {
 	return (char*)malloc(sizeof(char) * ((len + 2) * 5));
 }
 
+unsigned fprint_list_spacing(FILE *fd, unsigned flag)
+{
+	if(flag)
+	{
+		fprintf(fd, ", ");
+	}
+	return flag + 1;
+}
+
 int get_search_space_size(void)
 {
 	return search_space_size;
+}
+
+char* htmlspecialchars(char *src, size_t *slen)
+{
+	return str_multireplace(src, slen,
+			htmlspecialchars_replaces,
+			htmlspecialchars_replace_count);
+}
+
+size_t htmlspecialchars_fast(char *dst, const char *src, size_t slen)
+{
+	return str_multireplace_fast(dst, src, slen,
+			htmlspecialchars_replaces,
+			htmlspecialchars_replace_count);
 }
 
 void* memdup(const void *src, size_t len)
@@ -512,18 +659,35 @@ char* str_replace(char *src, const char *needle, const char *replacement)
 	return ret;
 }
 
-char* htmlspecialchars(char *src, size_t *slen)
+int strstr_normal(const char *needle, size_t nlen, const char *haystack,
+		size_t hlen)
 {
-	return str_multireplace(src, slen,
-			htmlspecialchars_replaces,
-			htmlspecialchars_replace_count);
+	//printf("Searching for %s (%u) in %s (%u)\n", needle, (unsigned)nlen, haystack, (unsigned)hlen);
+	for(unsigned ii = 0;
+			(nlen <= hlen - ii);
+			++ii)
+	{
+		if(strstr_start_normal(needle, nlen, haystack + ii))
+		{
+			return (int)ii;
+		}
+	}
+	return -1;
 }
 
-size_t htmlspecialchars_fast(char *dst, const char *src, size_t slen)
+int strstr_wildcard(const char *needle, size_t nlen, const char *haystack,
+		size_t hlen)
 {
-	return str_multireplace_fast(dst, src, slen,
-			htmlspecialchars_replaces,
-			htmlspecialchars_replace_count);
+	for(unsigned ii = 0;
+			(nlen <= hlen - ii);
+			++ii)
+	{
+		if(strstr_start_wildcard(needle, nlen, haystack + ii))
+		{
+			return (int)ii;
+		}
+	}
+	return -1;
 }
 
 ////////////////////////////////////////

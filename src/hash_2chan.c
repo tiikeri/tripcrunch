@@ -107,13 +107,16 @@ static char* encrypt_2chan(const char *src, size_t srclen)
 static int test_2chan(const char *src, size_t srclen, FILE *print);
 static int test_2chan(const char *src, size_t srclen, FILE *print)
 {
-	char salt[3], enc[14],
+	char salt[3],
+			 enc[14],
+			 cmp[11],
 			 *str = create_safe_cstr_buffer(srclen);
 
 	generate_salt(salt, str, src, srclen);
 
 	DES_fcrypt(str, salt, enc);
-	tripcrunch_test(src, enc + 3, 10, print);
+	trip_transform(cmp, enc + 3, 10);
+	trip_compare(src, enc + 3, cmp, 10, print);
 	free(str);
 	return 1;
 }

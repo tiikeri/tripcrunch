@@ -49,13 +49,26 @@ typedef struct encrypt_info_struct
 
 /** \brief Test a tripcode against all searched codes.
  *
- * @param trip Tripcode tested.
- * @param code Encryption result.
- * @param len Length of the result.
+ * Halts on the first match.
+ *
+ * @param trip Encryption input.
+ * @param result Encryption result.
+ * @param compare Transformed string used for comparison.
+ * @param len Length of the comparison string.
  * @param stream Stream to print the match in.
- * @return Number of matches found or zero.
+ * @return Nonzero if at least one match, zero otherwise.
  */
-extern int tripcrunch_test(const char *trip, const char *code, size_t len,
-		FILE *stream);
+extern int trip_compare(const char *trip, const char *result,
+		const char *compare, size_t len, FILE *stream);
+
+/** \brief Transform a tripcode according to transformation rules.
+ *
+ * The length of source may not be 0.
+ *
+ * @param dst Destination C string, must have enough space.
+ * @param src Source C string.
+ * @param len Length of source string.
+ */
+extern void trip_transform(char *dst, const char *src, size_t len);
 
 #endif

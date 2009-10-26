@@ -3,6 +3,9 @@
 
 #include "tripcrunch.h"
 
+/** Wildcard character for comparisons. */
+#define WILDCARD_CHAR '?'
+
 /** \brief Struct for char replacements.
  */
 typedef struct char_replace_struct
@@ -17,6 +20,34 @@ typedef struct char_replace_struct
 	size_t dstlen;
 } char_replace_t;
 
+/** \brief Transform character (case sensitive, no leet).
+ *
+ * @param src Source character.
+ * @return Transformed character.
+ */
+extern char char_transform_identity(char src);
+
+/** \brief Transform character (case insensitive, no leet).
+ *
+ * @param src Source character.
+ * @return Transformed character.
+ */
+extern char char_transform_nocase(char src);
+
+/** \brief Transform character (leet).
+ *
+ * @param src Source character.
+ * @return Transformed character.
+ */
+extern char char_transform_leet(char src);
+
+/** \brief Transform character (case insensitive, leet).
+ *
+ * @param src Source character.
+ * @return Transformed character.
+ */
+extern char char_transform_nocase_leet(char src);
+
 /** \brief Creates a string buffer with a safe size.
  *
  * In practice, takes into account the worst possible space any string
@@ -30,11 +61,47 @@ typedef struct char_replace_struct
  */
 extern char* create_safe_cstr_buffer(size_t len);
 
+/** \brief Print a list spacing.
+ *
+ * Prints a list item spacing, i.e. either nothing or a ", " -string. Modifies
+ * a flag variable to signify future prints.
+ *
+ * @param fd FILE object to use.
+ * @param flag Flag variable.
+ * @return New flag variable (i.e. uncremented by 1).
+ */
+extern unsigned fprint_list_spacing(FILE *fd, unsigned flag);
+
 /** \brief Get the size of the current search space.
  *
  * @return Current search space size.
  */
 extern int get_search_space_size(void);
+
+/** \brief Perform a htmlspecialchars replace on a source string.
+ *
+ * Will free the source string if it's modified.
+ *
+ * @param src Source string.
+ * @param slen Input string size pointer.
+ * @return String with htmlspecialchars done on it.
+ */
+extern char* htmlspecialchars(char *src, size_t *slen);
+
+/** \brief Perform a fast htmlspecialchars replace on a source string.
+ *
+ * Works like htmlspecialchars(char*, size_t*), but requires a destination
+ * character buffer to write the result into.
+ *
+ * The destination buffer must be large enough to accomodate the worst-case
+ * replacement.
+ *
+ * @param dst Destination buffer.
+ * @param src Source string.
+ * @param slen Input string length.
+ * @return Length of destination string.
+ */
+extern size_t htmlspecialchars_fast(char *dst, const char *src, size_t slen);
 
 /** \brief Duplicate a memory segment with a given length.
  *
@@ -165,29 +232,32 @@ extern size_t str_multireplace_fast(char *dst, const char *src, size_t slen,
 extern char* str_replace(char *src, const char *needle,
 		const char *replacement);
 
-/** \brief Perform a htmlspecialchars replace on a source string.
+/** \brief Search string needle in string haystack.
  *
- * Will free the source string if it's modified.
+ * Normal version, no wildcards.
  *
- * @param src Source string.
- * @param slen Input string size pointer.
- * @return String with htmlspecialchars done on it.
+ * The length of needle may not be 0.
+ *
+ * @param needle String to find.
+ * @param nlen Needle length.
+ * @param haystack String to find in.
+ * @param hlen Haystack length.
+ * @return Index first found in or negative if none.
  */
-extern char* htmlspecialchars(char *src, size_t *slen);
+extern int strstr_normal(const char *needle, size_t nlen,
+		const char *haystack, size_t hlen);
 
-/** \brief Perform a fast htmlspecialchars replace on a source string.
+/** \brief Search string needle in string haystack.
  *
- * Works like htmlspecialchars(char*, size_t*), but requires a destination
- * character buffer to write the result into.
+ * As with strstr_normal, but accepts wildcard character.
  *
- * The destination buffer must be large enough to accomodate the worst-case
- * replacement.
- *
- * @param dst Destination buffer.
- * @param src Source string.
- * @param slen Input string length.
- * @return Length of destination string.
+ * @param needle String to find.
+ * @param nlen Needle length.
+ * @param haystack String to find in.
+ * @param hlen Haystack length.
+ * @return Index first found in or negative if none.
  */
-extern size_t htmlspecialchars_fast(char *dst, const char *src, size_t slen);
+extern int strstr_wildcard(const char *needle, size_t nlen,
+		const char *haystack, size_t hlen);
 
 #endif
