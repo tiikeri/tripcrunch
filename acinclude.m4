@@ -276,33 +276,48 @@ AC_DEFUN([AC_COMPILE_MODE],
   	AC_MSG_RESULT([normal])
 		AC_CHECK_CFLAG([-O2])
 	fi
-	AC_CHECK_CFLAG([-pipe])
 	if test x$debug = xno ; then
 		AC_CHECK_CFLAG([-fomit-frame-pointer])
 		AC_CHECK_LDFLAG([-s])
 	fi
 	if test x$debug$optimizations != xnono ; then
 		AC_CHECK_CFLAG([-Wall])
+		dnl AC_CHECK_CFLAG([-Waggregate-return])
+		AC_CHECK_CFLAG([-Wcast-align])
 		AC_CHECK_CFLAG([-Wconversion])
 		AC_CHECK_CFLAG([-Wdisabled-optimization])
 		AC_CHECK_CFLAG([-Wextra])
 		AC_CHECK_CFLAG([-Winit-self])
 		AC_CHECK_CFLAG([-Winline])
-		AC_CHECK_CCFLAG([-Wmissing-declarations])
+		AC_CHECK_CFLAG([-Winvalid-pch])
+		dnl AC_CHECK_CFLAG([-Wlogical-op])
+		AC_CHECK_CFLAG([-Wmissing-declarations])
+		AC_CHECK_CFLAG([-Wmissing-format-attribute])
 		AC_CHECK_CFLAG([-Wmissing-include-dirs])
-		AC_CHECK_CCFLAG([-Wmissing-prototypes])
-		AC_CHECK_CXXFLAG([-Wold-style-cast])
-		AC_CHECK_CCFLAG([-Wold-style-definition])
-		AC_CHECK_CXXFLAG([-Woverloaded-virtual])
+		AC_CHECK_CFLAG([-Wmissing-noreturn])
+		AC_CHECK_CFLAG([-Wno-multichar])
+		AC_CHECK_CFLAG([-Wpacked])
+		AC_CHECK_CFLAG([-Wredundant-decls])
 		AC_CHECK_CFLAG([-Wshadow])
-		AC_CHECK_CFLAG([-Wstrict-aliaising=2])
-		AC_CHECK_CCFLAG([-Wstrict-prototypes])
+		dnl AC_CHECK_CFLAG([-Wstrict-overflow=5])
 		AC_CHECK_CFLAG([-Wswitch-default])
+		dnl AC_CHECK_CFLAG([-Wswitch-enum])
+		AC_CHECK_CFLAG([-Wundef])
+		dnl AC_CHECK_CFLAG([-Wunsafe-loop-optimizations])
+		AC_CHECK_CFLAG([-Wwrite-strings])
+		AC_CHECK_CCFLAG([-Wbad-function-cast])
+		AC_CHECK_CCFLAG([-Wmissing-prototypes])
+		AC_CHECK_CCFLAG([-Wnested-externs])
+		AC_CHECK_CCFLAG([-Wold-style-definition])
+		AC_CHECK_CCFLAG([-Wstrict-prototypes])
+		AC_CHECK_CXXFLAG([-Wctor-dtor-privacy])
+		AC_CHECK_CXXFLAG([-Wold-style-cast])
+		AC_CHECK_CXXFLAG([-Woverloaded-virtual])
+		AC_CHECK_CXXFLAG([-Werror=non-virtual-dtor])
 	fi
-	if test x$debug$optimizations = xnoyes ; then
-		AC_CHECK_CFLAG([-ftracer])
-		AC_CHECK_CFLAG([-fweb])
-	fi
+	AC_CHECK_CFLAG([-ftracer])
+	AC_CHECK_CFLAG([-fweb])
+	AC_CHECK_CFLAG([-pipe])
 
 	AC_CHECK_HEADER_DIRECTORY([/opt/include])
 	AC_CHECK_LIBRARY_DIRECTORY([/opt/lib])
@@ -564,7 +579,7 @@ AC_DEFUN([AC_INCORPORATE_OPENMP],
 		CXXFLAGS="$CXXFLAGS_save"
 	fi
 
-	AC_MSG_CHECKING([if $LD accepts -fopenmp])
+	AC_MSG_CHECKING([if linker accepts -fopenmp])
 	LDFLAGS_save=[$LDFLAGS]
 	AC_ADD_LDFLAG([-fopenmp])
 	AC_TRY_LINK([],

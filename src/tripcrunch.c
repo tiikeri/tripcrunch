@@ -363,10 +363,10 @@ int main(int argc, char **argv)
 	static const char *opts_short = "2cbhlgn:p:s:w";
 
 	// Local args.
-	int enable_generate = 0,
-			enable_leet = 0,
-			enable_case = 0,
-			enable_wildcard = 0;
+	uint8_t enable_generate = 0,
+					enable_leet = 0,
+					enable_case = 0,
+					enable_wildcard = 0;
 	while(1)
 	{
 		int indexptr = 0;
