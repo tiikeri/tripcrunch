@@ -25,8 +25,6 @@
  * @return New string length.
  */
 static size_t generate_salt(char *salt, char *buf, const char *src,
-		size_t slen);
-static size_t generate_salt(char *salt, char *buf, const char *src,
 		size_t slen)
 {
 	// Need a duplicate for htmlspecialchars.
@@ -84,7 +82,6 @@ static size_t generate_salt(char *salt, char *buf, const char *src,
  * @param srclen Length of source in chars.
  * @return Newly allocated encrypted string.
  */
-static char* encrypt_2chan(const char *src, size_t srclen);
 static char* encrypt_2chan(const char *src, size_t srclen)
 {
 	char salt[3], enc[14],
@@ -104,7 +101,6 @@ static char* encrypt_2chan(const char *src, size_t srclen)
  * @param print File to print into.
  * @return Number of tests done.
  */
-static int test_2chan(const char *src, size_t srclen, FILE *print);
 static int test_2chan(const char *src, size_t srclen, FILE *print)
 {
 	char salt[3],

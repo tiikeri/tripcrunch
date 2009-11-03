@@ -125,7 +125,6 @@ static int (*strstr_func)(const char*, size_t, const char*, size_t);
  *
  * @param signum Signal acquired.
  */
-static void tripcrunch_signal_handler(int signum);
 static void tripcrunch_signal_handler(int signum)
 {
 	switch(signum)
@@ -156,7 +155,6 @@ static void tripcrunch_signal_handler(int signum)
  * @param filename File to read.
  * @return Tripcode read or NULL.
  */
-static char* progress_read(const char *filename);
 static char* progress_read(const char *filename)
 {
 	FILE *pfile = fopen(filename, "r");
@@ -204,7 +202,6 @@ static char* progress_read(const char *filename)
  *
  * @return Current time in microseconds.
  */
-static int64_t get_current_time_int64(void);
 static int64_t get_current_time_int64(void)
 {
 	struct timeval tv;
@@ -219,7 +216,6 @@ static int64_t get_current_time_int64(void)
  * @param filename File to write.
  * @param trip Tripcode to save.
  */
-static void progress_save(const char *filename, char *trip);
 static void progress_save(const char *filename, char *trip)
 {
 	if(!trip || (strlen(trip) <= 0))
@@ -247,7 +243,6 @@ static void progress_save(const char *filename, char *trip)
  *
  * @param args Thread information.
  */
-static void* threadfunc_tripcrunch(void *args);
 static void* threadfunc_tripcrunch(void *args)
 {
 	// Read the current index and calculate initial string according to them.
@@ -277,7 +272,6 @@ static void* threadfunc_tripcrunch(void *args)
 
 /** \brief Free all reserved global memory.
  */
-static void exit_cleanup(void);
 static void exit_cleanup(void)
 {
 	if(search_tripcodes)
@@ -348,16 +342,16 @@ int main(int argc, char **argv)
 	// Option arguments.
 	static const struct option opts_long[] =
 	{
-		{	"2chan", no_argument, NULL, '2' },
-		{	"benchmark", no_argument, NULL, 'h' },
-		{	"enable-case", no_argument, NULL, 'c' },
-		{	"help", no_argument, NULL, 'h' },
-		{	"enable-leet", no_argument, NULL, 'l' },
-		{	"generate", no_argument, NULL, 'g' },
-		{	"nthreads", required_argument, NULL, 'n' },
-		{	"progress-file", required_argument, NULL, 'p' },
-		{	"start-from", required_argument, NULL, 's' },
-		{	"wildcard", no_argument, NULL, 'w' },
+		{ "2chan", no_argument, NULL, '2' },
+		{ "benchmark", no_argument, NULL, 'h' },
+		{ "enable-case", no_argument, NULL, 'c' },
+		{ "help", no_argument, NULL, 'h' },
+		{ "enable-leet", no_argument, NULL, 'l' },
+		{ "generate", no_argument, NULL, 'g' },
+		{ "nthreads", required_argument, NULL, 'n' },
+		{ "progress-file", required_argument, NULL, 'p' },
+		{ "start-from", required_argument, NULL, 's' },
+		{ "wildcard", no_argument, NULL, 'w' },
 		{ NULL, 0, 0, 0 }
 	};
 	static const char *opts_short = "2cbhlgn:p:s:w";
