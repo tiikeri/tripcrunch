@@ -121,7 +121,6 @@ static int test_2chan(const char *src, size_t srclen, FILE *print)
 // Global //////////////////////////////
 ////////////////////////////////////////
 
-/** Search space for strings. */
 const encrypt_info_t encrypt_info_2chan =
 {
 	"2chan / 4chan",
