@@ -58,11 +58,11 @@ AC_SUBST(LIBTOOL_VERSION)
 
 echo "
 Configuration for $PACKAGE_TARNAME $PACKAGE_VERSION:
-	Enable debug:             $TRIPCRUNCH_DEBUG
-	Enable optimizations:     $optimizations
-	Compiler:                 $CC
-	Compiler flags:           $CFLAGS
-	Linker flags:             $LDFLAGS
-	Libs:                     $LIBS
-	Install prefix:           $prefix
+	Enable debug:            $TRIPCRUNCH_DEBUG
+	Enable optimizations:    $optimizations
+	Compiler:                $CC
+	Compiler flags:          $CFLAGS
+	Linker flags:            $LDFLAGS
+	Libs:                    $LIBS
+	Install prefix:          $prefix
 Type 'make' to build and 'make install' to install $PACKAGE."
