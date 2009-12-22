@@ -286,6 +286,7 @@ AC_DEFUN([AC_COMPILE_MODE],
 		AC_CHECK_CFLAG([-Wcast-align])
 		AC_CHECK_CFLAG([-Wconversion])
 		AC_CHECK_CFLAG([-Wdisabled-optimization])
+		AC_CHECK_CFLAG([-Werror=return-type])
 		AC_CHECK_CFLAG([-Wextra])
 		AC_CHECK_CFLAG([-Winit-self])
 		AC_CHECK_CFLAG([-Winline])
@@ -311,9 +312,9 @@ AC_DEFUN([AC_COMPILE_MODE],
 		AC_CHECK_CCFLAG([-Wold-style-definition])
 		AC_CHECK_CCFLAG([-Wstrict-prototypes])
 		AC_CHECK_CXXFLAG([-Wctor-dtor-privacy])
+		AC_CHECK_CXXFLAG([-Werror=non-virtual-dtor])
 		AC_CHECK_CXXFLAG([-Wold-style-cast])
 		AC_CHECK_CXXFLAG([-Woverloaded-virtual])
-		AC_CHECK_CXXFLAG([-Werror=non-virtual-dtor])
 	fi
 	AC_CHECK_CFLAG([-ftracer])
 	AC_CHECK_CFLAG([-fweb])
