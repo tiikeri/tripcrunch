@@ -25,28 +25,28 @@ typedef struct char_replace_struct
  * @param src Source character.
  * @return Transformed character.
  */
-extern char char_transform_identity(char src);
+extern int char_transform_identity(int src);
 
 /** \brief Transform character (case insensitive, no leet).
  *
  * @param src Source character.
  * @return Transformed character.
  */
-extern char char_transform_nocase(char src);
+extern int char_transform_nocase(int src);
 
 /** \brief Transform character (leet).
  *
  * @param src Source character.
  * @return Transformed character.
  */
-extern char char_transform_leet(char src);
+extern int char_transform_leet(int src);
 
 /** \brief Transform character (case insensitive, leet).
  *
  * @param src Source character.
  * @return Transformed character.
  */
-extern char char_transform_nocase_leet(char src);
+extern int char_transform_nocase_leet(int src);
 
 /** \brief Creates a string buffer with a safe size.
  *

@@ -50,7 +50,6 @@ static const size_t htmlspecialchars_replace_count = 4;
  * @param idx Index to fetch from.
  * @return Character found.
  */
-static inline char search_lookup_forward(int idx);
 static inline char search_lookup_forward(int idx)
 {
 #ifdef TRIPCRUNCH_DEBUG
@@ -69,24 +68,21 @@ static inline char search_lookup_forward(int idx)
  * @param cc Character.
  * @return Index of that character in the search space.
  */
-static inline int search_lookup_backward(char cc);
-static inline int search_lookup_backward(char cc)
+static inline int search_lookup_backward(int cc)
 {
-	int idx = (int)cc;
-
 #ifdef TRIPCRUNCH_DEBUG
-	if((idx < 0) || ((unsigned)idx >= SEARCH_MAX_ORD))
+	if((cc < 0) || ((unsigned)cc >= SEARCH_MAX_ORD))
 	{
 		printf("ERROR, search space char out of range");
 		exit(1);
 	}
 #endif
 
-	int ret = search_lookup[idx];
+	int ret = search_lookup[cc];
 #ifdef TRIPCRUNCH_DEBUG
 	if(ret < 0)
 	{
-		printf("ERROR, invalid search space char: %c", cc);
+		printf("ERROR, invalid search space char: %c", (char)cc);
 		exit(1);
 	}
 #endif
@@ -103,16 +99,15 @@ static inline int search_lookup_backward(char cc)
  *
  * @param old Old string.
  * @param oldlen Old string length.
- * @param chr Character to append.
+ * @param cc Character to append.
  * @return New string.
  */
-static char* str_prepend(char *old, size_t oldlen, char chr);
-static char* str_prepend(char *old, size_t oldlen, char chr)
+static char* str_prepend(char *old, size_t oldlen, int cc)
 {
 	char *ret = (char*)malloc(sizeof(char) * (oldlen + 2));
 	memcpy(ret + 1, old, oldlen + 1);
 	free(old);
-	ret[0] = chr;
+	ret[0] = (char)cc;
 	return ret;
 }
 
@@ -125,7 +120,6 @@ static char* str_prepend(char *old, size_t oldlen, char chr)
  * @param rhs Right-hand-side operand.
  * @return Nonzero if equals, zero if differ.
  */
-static int strstr_start_normal(const char *lhs, size_t lhslen, const char *rhs);
 static int strstr_start_normal(const char *lhs, size_t lhslen, const char *rhs)
 {
 	char *liter = (char*)lhs,
@@ -150,7 +144,6 @@ static int strstr_start_normal(const char *lhs, size_t lhslen, const char *rhs)
  * @param rhs Right-hand-side operand.
  * @return Nonzero if equals, zero if differ.
  */
-static int strstr_start_wildcard(const char *lhs, size_t lhslen, const char *rhs);
 static int strstr_start_wildcard(const char *lhs, size_t lhslen, const char *rhs)
 {
 	char *liter = (char*)lhs,
@@ -171,17 +164,17 @@ static int strstr_start_wildcard(const char *lhs, size_t lhslen, const char *rhs
 // Extern //////////////////////////////
 ////////////////////////////////////////
 
-char char_transform_identity(char src)
+int char_transform_identity(int src)
 {
 	return src;
 }
 
-char char_transform_nocase(char src)
+int char_transform_nocase(int src)
 {
-	return (char)tolower(src);
+	return tolower(src);
 }
 
-char char_transform_leet(char src)
+int char_transform_leet(int src)
 {
 	switch(src)
 	{
@@ -211,9 +204,9 @@ char char_transform_leet(char src)
 	}
 }
 
-char char_transform_nocase_leet(char src)
+int char_transform_nocase_leet(int src)
 {
-	src = (char)tolower(src);
+	src = tolower(src);
 
 	switch(src)
 	{

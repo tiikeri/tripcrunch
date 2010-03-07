@@ -112,7 +112,7 @@ static long int thread_count = 1;
 static encrypt_info_t einfo = { NULL, NULL, 0, NULL, NULL };
 
 /** Character transform function. */
-static char (*char_transform_func)(char) = NULL;
+static int (*char_transform_func)(int) = NULL;
 
 /** String search function. */
 static int (*strstr_func)(const char*, size_t, const char*, size_t);
@@ -650,8 +650,15 @@ int main(int argc, char **argv)
 	// Immediately start joining the threads.
 	for(int ii = 0; (ii < thread_count); ++ii)
 	{
-		thread_info_t *tinfo;
-		pthread_join(threads[ii], (void**)(&tinfo));
+		void **thr_ret = NULL;
+		pthread_join(threads[ii], thr_ret);
+		if(!thr_ret)
+		{
+			fprintf(stderr, "ERROR: no return value from thread %i\n", ii);
+			return 1; // Should never happen, okay to not clean up.
+		}
+		thread_info_t *tinfo = (thread_info_t*)(*thr_ret);
+
 
 		char *trip = tinfo->trip.trip;
 		size_t len = tinfo->trip.len;

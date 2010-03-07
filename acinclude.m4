@@ -263,6 +263,7 @@ AC_DEFUN([AC_COMPILE_MODE],
 		AC_CHECK_CFLAG([-O0])
 		AC_CHECK_CFLAG([-g])
 		AC_CHECK_CFLAG([-funit-at-a-time])
+		AC_CHECK_CXXFLAG([-Wold-style-cast]) dnl Creates clutter otherwise.
 	elif test x$optimizations != xno ; then
   	AC_MSG_RESULT([optimized])
 		AC_CHECK_CFLAG([-O3])
@@ -282,17 +283,15 @@ AC_DEFUN([AC_COMPILE_MODE],
 	fi
 	if test x$debug$optimizations != xnono ; then
 		AC_CHECK_CFLAG([-Wall])
-		dnl AC_CHECK_CFLAG([-Waggregate-return])
 		AC_CHECK_CFLAG([-Wcast-align])
 		AC_CHECK_CFLAG([-Wconversion])
 		AC_CHECK_CFLAG([-Wdisabled-optimization])
 		AC_CHECK_CFLAG([-Werror=return-type])
 		AC_CHECK_CFLAG([-Wextra])
 		AC_CHECK_CFLAG([-Winit-self])
-		AC_CHECK_CFLAG([-Winline])
+		dnl AC_CHECK_CFLAG([-Winline])
 		AC_CHECK_CFLAG([-Winvalid-pch])
 		dnl AC_CHECK_CFLAG([-Wlogical-op])
-		AC_CHECK_CFLAG([-Wmissing-declarations])
 		AC_CHECK_CFLAG([-Wmissing-format-attribute])
 		AC_CHECK_CFLAG([-Wmissing-include-dirs])
 		AC_CHECK_CFLAG([-Wmissing-noreturn])
@@ -307,13 +306,13 @@ AC_DEFUN([AC_COMPILE_MODE],
 		dnl AC_CHECK_CFLAG([-Wunsafe-loop-optimizations])
 		AC_CHECK_CFLAG([-Wwrite-strings])
 		AC_CHECK_CCFLAG([-Wbad-function-cast])
+		AC_CHECK_CCFLAG([-Wmissing-declarations])
 		AC_CHECK_CCFLAG([-Wmissing-prototypes])
 		AC_CHECK_CCFLAG([-Wnested-externs])
 		AC_CHECK_CCFLAG([-Wold-style-definition])
 		AC_CHECK_CCFLAG([-Wstrict-prototypes])
 		AC_CHECK_CXXFLAG([-Wctor-dtor-privacy])
 		AC_CHECK_CXXFLAG([-Werror=non-virtual-dtor])
-		AC_CHECK_CXXFLAG([-Wold-style-cast])
 		AC_CHECK_CXXFLAG([-Woverloaded-virtual])
 	fi
 	AC_CHECK_CFLAG([-ftracer])
@@ -332,25 +331,6 @@ AC_DEFUN([AC_COMPILE_MODE],
 	AC_CHECK_LIBRARY_DIRECTORY([/usr/X11R6/lib])
 ])
 
-dnl Enables or disables tests.
-dnl AC_ENABLE_TESTS([TEST_DEFINE], [action if yes], [action if no])
-AC_DEFUN([AC_ENABLE_TESTS],
-[
-	AC_MSG_CHECKING([whether tests are enabled])
-	AC_ARG_ENABLE([tests],
-		AC_HELP_STRING([--enable-tests],
-			[Build non-installable test programs (default: no)]),
-		tests=[yes],
-		tests=[no])
-	AC_CONDITIONAL_DEFINE([$1], [$tests])
-	AC_MSG_RESULT([$tests])
-	if test x$tests = xyes ; then
-		ifelse([$2], , :, [$2])
-	else
-		ifelse([$3], , :, [$3])
-	fi
-])
-
 dnl Create a specific configuration file accepting only certain types of
 dnl flags.
 dnl AC_SPECIFIC_HEADER([TEMPORARY_CONFIG_FILE_NAME], [FINAL_CONFIG_FILE_NAME], [CONFIGURATION_TERM_PREFIX])
@@ -364,7 +344,7 @@ dnl Check for 32/64 -bit memory space.
 dnl AC_CHECK_POINTER_SIZE([DEFINE_IF_32], [DEFINE_IF_64])
 AC_DEFUN([AC_CHECK_POINTER_SIZE],
 [
-	AC_MSG_CHECKING([If pointer size is 32 bits])
+	AC_MSG_CHECKING([if pointer size is 32 bits])
 	AC_RUN_IFELSE(
 		[int main(void)
 		{
@@ -383,7 +363,7 @@ AC_DEFUN([AC_CHECK_POINTER_SIZE],
 		AC_MSG_RESULT([no])
 	fi
 	AC_CONDITIONAL_DEFINE([$2], [$acptrsize32bit])
-	AC_MSG_CHECKING([If pointer size is 64 bits])
+	AC_MSG_CHECKING([if pointer size is 64 bits])
 	AC_RUN_IFELSE(
 		[int main(void)
 		{
@@ -436,6 +416,58 @@ AC_DEFUN([AC_INCORPORATE_PKGCONFIG],
 	AC_INCORPORATE([$1], [$pkgc], $[$1[]_CFLAGS], $[$1[]_LIBS], $3, $4)
 ])
 
+dnl Incorporate Boost filesystem.
+dnl AC_INCORPORATE_BOOST_FILESYSTEM([define on found], [obligatory])
+AC_DEFUN([AC_INCORPORATE_BOOST_FILESYSTEM],
+[
+	AC_LANG_PUSH([C++])
+	AC_CHECK_LIB([boost_filesystem], [main])
+	AC_INCORPORATE([boost_filesystem], [$ac_cv_lib_boost_filesystem_main], [], [], [$1], [$2])
+	AC_LANG_POP([C++])
+])
+
+dnl Incorporate Boost program options.
+dnl AC_INCORPORATE_BOOST_PROGRAM_OPTIONS([define on found], [obligatory])
+AC_DEFUN([AC_INCORPORATE_BOOST_PROGRAM_OPTIONS],
+[
+	AC_LANG_PUSH([C++])
+	AC_CHECK_LIB([boost_program_options], [main])
+	AC_INCORPORATE([boost_program_options], [$ac_cv_lib_boost_program_options_main], [], [], [$1], [$2])
+	AC_LANG_POP([C++])
+])
+
+dnl Incorporate Boost unit test framework
+dnl AC_INCORPORATE_BOOST_UNIT_TEST_FRAMEWORK([define on found], [obligatory])
+AC_DEFUN([AC_INCORPORATE_BOOST_UNIT_TEST_FRAMEWORK],
+[
+	AC_LANG_PUSH([C++])
+	boost_unit_test_framework=[yes]
+	AC_CHECK_LIB([boost_unit_test_framework],
+		[main])
+	if test "x$ac_cv_lib_boost_unit_test_framework_main" != "xyes" ; then
+		AC_CHECK_LIB([boost_unit_test_framework-mt],
+			[main])
+		if test "x$ac_cv_lib_boost_unit_test_framework_main-mt" != "xyes" ; then
+			AC_CHECK_LIB([boost_unit_test_framework-st],
+				[main])
+			boost_unit_test_framework=[$ac_cv_lib_boost_unit_test_framework_main-st]
+		fi
+	fi
+	AC_MSG_CHECKING([if Boost unit test framework is ok])
+	if test "x$boost_unit_test_framework" = xyes ; then
+		AC_MSG_RESULT([yes])
+		AC_CONDITIONAL_DEFINE([$1], [yes])
+		AC_CHECK_CFLAG([-DBOOST_TEST_DYN_LINK])
+	elif test "x$2" = "xyes" ; then
+		AC_MSG_ERROR([no])
+		AC_CONDITIONAL_DEFINE([$1], [no])
+	else
+		AC_MSG_RESULT([no])
+		AC_CONDITIONAL_DEFINE([$1], [no])
+	fi
+	AC_LANG_POP([C++])
+])
+
 dnl Incorporate Freetype2.
 dnl AC_INCORPORATE_FREETYPE2([version], [define on found], [obligatory])
 AC_DEFUN([AC_INCORPORATE_FREETYPE2],
@@ -444,6 +476,36 @@ AC_DEFUN([AC_INCORPORATE_FREETYPE2],
 		freetype2=[yes],
 		freetype2=[no])
 	AC_INCORPORATE([Freetype2], [$freetype2], [$FT2_CFLAGS], [$FT2_LIBS], [$2], [$3])
+])
+
+dnl Incorporate GLEW.
+dnl AC_INCORPORATE_GLEW([define on found], [obligatory])
+AC_DEFUN([AC_INCORPORATE_GLEW],
+[
+	AC_LANG_PUSH([C])
+	AC_CHECK_LIB([GLEW], [glewInit])
+	AC_INCORPORATE([GLEW], [$ac_cv_lib_GLEW_glewInit], [], [], [$1], [$2])
+	AC_LANG_POP([C])
+])
+
+dnl Incorporate GLUT.
+dnl AC_INCORPORATE_GLUT([define on found], [obligatory])
+AC_DEFUN([AC_INCORPORATE_GLUT],
+[
+	AC_LANG_PUSH([C])
+	AC_CHECK_LIB([glut], [glutInit])
+	AC_INCORPORATE([GLUT], [$ac_cv_lib_glut_glutInit], [], [], [$1], [$2])
+	AC_LANG_POP([C])
+])
+
+dnl Incorporate libpng.
+dnl AC_INCORPORATE_LIBPNG([version], [define on found], [obligatory])
+AC_DEFUN([AC_INCORPORATE_LIBJPEG],
+[
+	AC_LANG_PUSH([C])
+	AC_CHECK_LIB([jpeg], [jpeg_stdio_src])
+	AC_INCORPORATE([jpeg], [$ac_cv_lib_jpeg_jpeg_stdio_src], [], [], [$1], [$2])
+	AC_LANG_POP([C])
 ])
 
 dnl Incorporate libpng.
@@ -462,42 +524,18 @@ AC_DEFUN([AC_INCORPORATE_LIBPNG],
 	fi
 ])
 
-dnl Incorporate SDL.
-dnl AC_INCORPORATE_SDL([version], [define on found], [obligatory])a
-AC_DEFUN([AC_INCORPORATE_SDL],
-[
-	AM_PATH_SDL([$1],
-		sdl=[yes],
-		sdl=[no])
-	AC_INCORPORATE([SDL], [$sdl], [$SDL_CFLAGS], [$SDL_LIBS], [$2], [$3])
-])
-
 dnl Incorporate OpenGL.
 dnl This means both libGL and libGLU.
 dnl AC_INCORPORATE_OPENGL([define on found], [obligatory])
 AC_DEFUN([AC_INCORPORATE_OPENGL],
 [
 	AC_LANG_PUSH([C])
-	AC_SEARCH_LIBS([glFrustum],
-		[GL],
-		gl=[yes],
-		gl=[no])
-	AC_SEARCH_LIBS([gluPerspective],
-		[GLU],
-		glu=[yes],
-		glu=[no])
+	AC_CHECK_LIB([GL], [glFrustum])
+	AC_CHECK_LIB([GLU], [gluPerspective])
 	AC_MSG_CHECKING([if OpenGL is ok])
-	if test "x$gl" = "xyes" ; then
-		if test "x$glu" = "xyes" ; then
-			AC_MSG_RESULT([yes])
-			AC_CONDITIONAL_DEFINE([$1], [yes])
-		elif test "x$2" = "xyes" ; then
-			AC_MSG_ERROR([no])
-			AC_CONDITIONAL_DEFINE([$1], [no])
-		else
-			AC_MSG_RESULT([no])
-			AC_CONDITIONAL_DEFINE([$1], [no])
-		fi
+	if test "x$ac_cv_lib_GL_glFrustum$ac_cv_lib_GLU_gluPerspective" = "xyesyes" ; then
+		AC_MSG_RESULT([yes])
+		AC_CONDITIONAL_DEFINE([$1], [yes])
 	elif test "x$2" = "xyes" ; then
 		AC_MSG_ERROR([no])
 		AC_CONDITIONAL_DEFINE([$1], [no])
@@ -508,45 +546,15 @@ AC_DEFUN([AC_INCORPORATE_OPENGL],
 	AC_LANG_POP([C])
 ])
 
-dnl Incorporate GLUT.
-dnl AC_INCORPORATE_GLUT([define on found], [obligatory])
-AC_DEFUN([AC_INCORPORATE_GLUT],
-[
-	AC_LANG_PUSH([C])
-	AC_SEARCH_LIBS([glutInit],
-		[glut],
-		glut=[yes],
-		glut=[no])
-	AC_INCORPORATE([GLUT], [$glut], [], [], [$1], [$2])
-])
-
-dnl Require C standard.
-dnl AC_INCORPORATE_C99([define on found], [obligatory])
-AC_DEFUN([AC_REQUEST_C99],
-[
-	AC_PROG_CC_C99()
-	AC_MSG_CHECKING([for C99])
-	if test "x$ac_cv_prog_cc_c99" != "xno" ; then
-		AC_MSG_RESULT([yes])
-		AC_CONDITIONAL_DEFINE([$1], [yes])
-	else
-		if test x$obligatory = xyes ; then
-			AC_MSG_ERROR([no])
-		else
-			AC_MSG_RESULT([no])
-		fi
-	fi
-])
-
 dnl Check if openmp is supported.
 dnl AC_CHECK_OPENMP([define on yes], [obligatory])
 AC_DEFUN([AC_INCORPORATE_OPENMP],
 [
-	openmp_c=[yes]
+	openmp_cc=[yes]
 	openmp_cxx=[yes]
 	openmp_ld=[yes]
 
-	if test "x$CC" != x ; then
+	if test "x$CC" != "x" ; then
 		AC_LANG_PUSH([C])
 		AC_MSG_CHECKING([if $CC accepts -fopenmp])
 		CFLAGS_save=[$CFLAGS]
@@ -555,15 +563,15 @@ AC_DEFUN([AC_INCORPORATE_OPENMP],
 			[],
 			flag=[yes],
 			flag=[no])
-		if test x$flag = xno ; then
-			openmp_c=[no]
+		if test "x$flag" = "xno" ; then
+			openmp_cc=[no]
 		fi
 		AC_MSG_RESULT([$flag])
 		AC_LANG_POP([C])
 		CFLAGS="$CFLAGS_save"
 	fi
 
-	if test "x$CXX" != x ; then
+	if test "x$CXX" != "x" ; then
 		AC_LANG_PUSH([C++])
 		AC_MSG_CHECKING([if $CXX accepts -fopenmp])
 		CXXFLAGS_save=[$CXXFLAGS]
@@ -572,7 +580,7 @@ AC_DEFUN([AC_INCORPORATE_OPENMP],
 			[],
 			flag=[yes],
 			flag=[no])
-		if test x$flag = xno ; then
+		if test "x$flag" = "xno" ; then
 			openmp_cxx=[no]
 		fi
 		AC_MSG_RESULT([$flag])
@@ -587,14 +595,14 @@ AC_DEFUN([AC_INCORPORATE_OPENMP],
 		[],
 		flag=[yes],
 		flag=[no])
-	if test x$flag = xno ; then
+	if test "x$flag" = "xno" ; then
 		openmp_ld=[no]
 	fi
 	AC_MSG_RESULT([$flag])
 	LDFLAGS=[$LDFLAGS_save]
 
 	openmp_ok=[no]
-	if test x$openmp_c = xyes ; then
+	if test x$openmp_cc = xyes ; then
 		if test x$openmp_cxx = xyes ; then
 			if test x$openmp_ld = xyes ; then
 				openmp_ok=[yes]
@@ -603,4 +611,40 @@ AC_DEFUN([AC_INCORPORATE_OPENMP],
 	fi
 
 	AC_INCORPORATE([OpenMP], [$openmp_ok], [-fopenmp], [-fopenmp], [$1], [$2])
+])
+	
+dnl Incorporate SDL.
+dnl AC_INCORPORATE_SDL([version], [define on found], [obligatory])
+AC_DEFUN([AC_INCORPORATE_SDL],
+[
+	AM_PATH_SDL([$1],
+		sdl=[yes],
+		sdl=[no])
+	AC_INCORPORATE([SDL], [$sdl], [$SDL_CFLAGS], [$SDL_LIBS], [$2], [$3])
+])
+
+dnl Incorporate libxml2.
+dnl AC_INCORPORATE_LIBXML2([version], [define on found], [obligatory])
+AC_DEFUN([AC_INCORPORATE_LIBXML2],
+[
+	AM_PATH_XML2([$1],
+		xml2=[yes],
+		xml2=[no])
+	AC_INCORPORATE([libxml2], [$xml2], [$XML_CFLAGS], [$XML_LIBS], [$2], [$3])
+])
+	
+dnl Require C standard.
+dnl AC_INCORPORATE_C99([define on found], [obligatory])
+AC_DEFUN([AC_REQUEST_C99],
+[
+	AC_PROG_CC_C99()
+	AC_MSG_CHECKING([for C99])
+	if test "x$ac_cv_prog_cc_c99" != "xno" ; then
+		AC_MSG_RESULT([yes])
+		AC_CONDITIONAL_DEFINE([$1], [yes])
+	elif test x$obligatory = xyes ; then
+		AC_MSG_ERROR([no])
+	else
+		AC_MSG_RESULT([no])
+	fi
 ])
