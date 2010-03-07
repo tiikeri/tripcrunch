@@ -320,7 +320,7 @@ void trip_transform(char *dst, const char *src, size_t len)
 {
 	char *srciter = (char*)src;
 	do {
-		*dst = char_transform_func(*srciter);
+		*dst = (char)char_transform_func(*srciter);
 		++dst;
 		++srciter;
 	} while(--len);
@@ -581,7 +581,7 @@ int main(int argc, char **argv)
 		// Perform case transform in precalc!
 		for(size_t jj = 0; (jj < trip->len); ++jj)
 		{
-			trip->trip[jj] = char_transform_func(trip->trip[jj]);
+			trip->trip[jj] = (char)char_transform_func(trip->trip[jj]);
 		}
 	}
 
