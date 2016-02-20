@@ -1,0 +1,1 @@
+Tripcode generator intended for image boards.
